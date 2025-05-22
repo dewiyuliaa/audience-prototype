@@ -76,7 +76,7 @@ st.markdown("""
 def load_data():
     try:
         # Read the CSV file
-        df = pd.read_csv("~/Downloads/cnbc.csv", encoding='utf-8')
+        df = pd.read_csv("cnbc.csv", encoding='utf-8')
         
         # Convert date format to string (exactly like in your original code)
         df['date'] = pd.to_datetime(df['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
