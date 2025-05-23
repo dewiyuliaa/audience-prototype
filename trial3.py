@@ -302,7 +302,8 @@ date_range = st.sidebar.date_input(
     min_value=min_date,
     max_value=max_date,
     format="YYYY/MM/DD",
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="date_range_selector"
 )
 
 start_date = date_range[0] if len(date_range) > 0 else min_date
@@ -314,7 +315,8 @@ selected_cities = st.sidebar.multiselect(
     "",
     all_cities,
     default=[],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="city_selector"
 )
 
 # Age selector with no default - single select
@@ -323,7 +325,8 @@ selected_age = st.sidebar.selectbox(
     "",
     [""] + all_age_groups,  # Add empty option as first item
     index=0,  # Select the empty option
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="age_selector"
 )
 
 # Gender selector - NO default values
@@ -332,15 +335,15 @@ selected_genders = []
 if len(all_genders) >= 2:
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        if "female" in all_genders and st.checkbox("female", value=False):  # Changed to False
+        if "female" in all_genders and st.checkbox("female", value=False, key="female_checkbox"):
             selected_genders.append("female")
     with col2:
-        if "male" in all_genders and st.checkbox("male", value=False):  # Changed to False
+        if "male" in all_genders and st.checkbox("male", value=False, key="male_checkbox"):
             selected_genders.append("male")
 else:
     # Handle case where there might be different gender values
-    for gender in all_genders:
-        if st.sidebar.checkbox(gender, value=False):  # Changed to False
+    for i, gender in enumerate(all_genders):
+        if st.sidebar.checkbox(gender, value=False, key=f"gender_checkbox_{i}"):
             selected_genders.append(gender)
 
 # Kanal selector with no default
@@ -349,7 +352,8 @@ selected_kanal = st.sidebar.multiselect(
     "",
     all_kanals,
     default=[],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="kanal_selector"
 )
 
 # Device selector with no default - single select
@@ -358,7 +362,8 @@ selected_device = st.sidebar.selectbox(
     "",
     [""] + all_devices,  # Add empty option as first item
     index=0,  # Select the empty option
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="device_selector"
 )
 
 # Category selector - always show selector even if no categories
@@ -367,8 +372,43 @@ selected_categories = st.sidebar.multiselect(
     "",
     all_categories,  # Will be empty list if no categories, but selector still shows
     default=[],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="category_selector"
 )
+
+# Add Reset Filters button
+st.sidebar.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+if st.sidebar.button("🔄 Reset Filters", use_container_width=True, type="secondary"):
+    # Clear specific session state keys for our filters
+    filter_keys = [
+        "date_range_selector", "city_selector", "age_selector", 
+        "female_checkbox", "male_checkbox", "kanal_selector", 
+        "device_selector", "category_selector"
+    ]
+    
+    # Also clear any gender checkboxes that might have numbered keys
+    for i in range(len(all_genders)):
+        filter_keys.append(f"gender_checkbox_{i}")
+    
+    for key in filter_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Set default values to reset state
+    st.session_state["date_range_selector"] = [min_date, max_date]
+    st.session_state["city_selector"] = []
+    st.session_state["age_selector"] = ""
+    st.session_state["female_checkbox"] = False
+    st.session_state["male_checkbox"] = False
+    st.session_state["kanal_selector"] = []
+    st.session_state["device_selector"] = ""
+    st.session_state["category_selector"] = []
+    
+    # Set gender checkboxes to False for dynamic genders
+    for i in range(len(all_genders)):
+        st.session_state[f"gender_checkbox_{i}"] = False
+        
+    st.rerun()
 
 # Apply filters to the dataframe
 filtered_df = df.copy()
