@@ -80,7 +80,7 @@ def load_data():
         df2 = pd.read_csv("cnbc2_complete.csv", encoding='utf-8')
         
         # Process df1 (User Login data)
-        # Convert date format to string (exactly like in your original code)
+        # Convert date format to string
         df1['date'] = pd.to_datetime(df1['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
         
         # Add age_group column based on age ranges
@@ -126,14 +126,8 @@ def load_data():
         df1['kanal_group'] = df1['kanalid'].apply(categorize_kanal)
         
         # Process df2 (User Non Login data)
-        # Convert date format to string if needed
-        if 'date' in df2.columns:
-            # Check if date is already in the right format or needs conversion
-            try:
-                df2['date'] = pd.to_datetime(df2['date']).dt.strftime('%Y-%m-%d')
-            except:
-                # If already in string format, keep as is
-                pass
+        # Convert date format to string 
+        df2['date'] = pd.to_datetime(df2['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
         
         # Process df2 columns to match df1 structure
         if 'Gender' in df2.columns:
@@ -870,7 +864,7 @@ else:
     notes_text = """
     <div class='estimates-text'>
     <strong>Notes:</strong><br>
-    • <strong>Total audience</strong> is the sum of total users (including non-logged in users) during the selected period<br>
+    • <strong>Total audience</strong> is the sum of total users who haven't logged in to MPC during the selected period<br>
     • <strong>Views</strong> is the sum of all page views generated during the selected period<br>
     • <strong>Views per user</strong> is calculated as Total Views ÷ Total Users<br>
     • <strong>Average session duration (in seconds)</strong> is the weighted average session duration across all user segments<br>
