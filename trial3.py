@@ -218,9 +218,18 @@ def calculate_metrics(df, user_login=True):
         }
 
 def format_audience_range(estimated_value):
-    """Convert estimated audience to a range format"""
+    """Convert estimated audience to a range format with M/K formatting"""
     if estimated_value == 0:
         return "0"
+    
+    # Helper function to format individual values
+    def format_single_value(value):
+        if value >= 1000000:
+            return f"{value/1000000:.1f}M"
+        elif value >= 1000:
+            return f"{value/1000:.1f}K"
+        else:
+            return f"{value:,}"
     
     # Determine range based on the magnitude of the number
     if estimated_value < 10:
@@ -239,22 +248,23 @@ def format_audience_range(estimated_value):
         upper = base + 25
         return f"{lower:,} - {upper:,}"
     elif estimated_value < 10000:
-        # For numbers 1000-9999, round down to nearest 100 for lower bound
-        lower_base = (estimated_value // 100) * 100
-        upper_base = lower_base + 100
-        return f"{lower_base:,} - {upper_base:,}"
+        # For numbers 1000-9999, use K format
+        base = round(estimated_value / 100) * 100
+        lower = max(0, base - 100)
+        upper = base + 100
+        return f"{format_single_value(lower)} - {format_single_value(upper)}"
     elif estimated_value < 100000:
         # For numbers 10K-99K, round to nearest 1000 and create ±500 range
         base = round(estimated_value / 1000) * 1000
         lower = max(0, base - 500)
         upper = base + 500
-        return f"{lower:,} - {upper:,}"
+        return f"{format_single_value(lower)} - {format_single_value(upper)}"
     elif estimated_value < 1000000:
         # For numbers 100K-999K, round to nearest 5000 and create ±2500 range
         base = round(estimated_value / 5000) * 5000
         lower = max(0, base - 2500)
         upper = base + 2500
-        return f"{lower:,} - {upper:,}"
+        return f"{format_single_value(lower)} - {format_single_value(upper)}"
     else:
         # For numbers 1M+, format in millions with wider range
         value_in_millions = estimated_value / 1000000
@@ -264,13 +274,17 @@ def format_audience_range(estimated_value):
             base = round(value_in_millions * 10) / 10
             lower = max(0, base - 0.1)
             upper = base + 0.1
-            return f"{lower:.1f}M - {upper:.1f}M"
+            lower_formatted = f"{lower:.1f}M"
+            upper_formatted = f"{upper:.1f}M"
         else:
             # For 10M+, round to nearest 0.5M and create ±0.5M range
             base = round(value_in_millions * 2) / 2
             lower = max(0, base - 0.5)
             upper = base + 0.5
-            return f"{lower:.1f}M - {upper:.1f}M"
+            lower_formatted = f"{lower:.1f}M"
+            upper_formatted = f"{upper:.1f}M"
+        
+        return f"{lower_formatted} - {upper_formatted}"
 
 def format_number_display(value):
     """Format numbers for display - show millions as M, thousands as K"""
@@ -612,6 +626,9 @@ def update_filter_options_on_tab_switch():
                 # Reset to new dataset's full range
                 st.session_state["date_range_selector"] = [new_filter_options['min_date'], new_filter_options['max_date']]
     
+    # Keep chart type selection when switching tabs
+    # (Chart type selector will automatically use the persisted value)
+    
     return new_filter_options
 
 # Initialize or update filter options
@@ -935,7 +952,13 @@ with col1:
 
 with col2:
     st.subheader(f"Trend: Last {num_days} Days")
-    selected_chart = st.selectbox("", ["Area Chart", "Bar Chart", "Line Chart", "Scatter Plot"], label_visibility="collapsed")
+    
+    # Get the current chart type selection (with proper default handling)
+    if "chart_type_selector" not in st.session_state:
+        st.session_state.chart_type_selector = "Area Chart"
+    
+    selected_chart = st.selectbox("", ["Area Chart", "Bar Chart", "Line Chart", "Scatter Plot"], 
+                                 label_visibility="collapsed", key="chart_type_selector")
     
     # Handle chart display
     if daily_chart_data.empty:
@@ -948,14 +971,15 @@ with col2:
         chart_data['formatted_date'] = pd.to_datetime(daily_chart_data['date']).dt.strftime('%d %b %Y')
         chart_data = chart_data.set_index('formatted_date')
         
-        # Display the chart
-        if selected_chart == "Bar Chart":
-            st.bar_chart(chart_data[['audiences', 'views']])
-        elif selected_chart == "Line Chart":
+        # Debug: Show what chart type is selected
+        # st.write(f"Debug: Selected chart type is: {selected_chart}")
+        
+        # Display the chart based on selection
+        if selected_chart == "Line Chart":
             st.line_chart(chart_data[['audiences', 'views']])
-        elif selected_chart == "Area Chart":
-            st.area_chart(chart_data[['audiences', 'views']])
-        else:  # Scatter Plot
+        elif selected_chart == "Bar Chart":
+            st.bar_chart(chart_data[['audiences', 'views']])
+        elif selected_chart == "Scatter Plot":
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.scatter(chart_data['audiences'], chart_data['views'])
             ax.set_xlabel('Audience')
@@ -965,6 +989,8 @@ with col2:
             ax.set_xticks(range(len(dates)))
             ax.set_xticklabels([d.strftime('%d %b %Y') for d in dates], rotation=0)
             st.pyplot(fig)
+        else:  # Default to Area Chart
+            st.area_chart(chart_data[['audiences', 'views']])
 
 # Add space before subheader
 st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
