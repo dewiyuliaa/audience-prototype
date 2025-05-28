@@ -846,7 +846,25 @@ daily_chart_data = get_daily_metrics(filtered_df, 30, st.session_state.user_logi
 num_days = len(daily_chart_data)
 
 # Main content
-st.markdown("<h1 class='main-header'>Audience Insight Dashboard</h1>", unsafe_allow_html=True)
+# Create header with logo
+header_col1, header_col2 = st.columns([1, 6])
+
+with header_col1:
+    # Load and display the logo
+    try:
+        logo_path = "CNBC_logo.svg.png"
+        # Expand the tilde to full path
+        import os
+        logo_path = os.path.expanduser(logo_path)
+        st.image(logo_path, width=90)  # Adjust width to fit with header
+    except Exception as e:
+        st.write("")  # Silent fail if logo not found
+
+with header_col2:
+    # Add negative margin to pull the header closer to the logo
+    st.markdown("""
+    <h1 class='main-header' style='margin-left: -35px;'>Audience Insight Dashboard</h1>
+    """, unsafe_allow_html=True)
 
 # Create tabs
 tab1, tab2 = st.columns(2)
