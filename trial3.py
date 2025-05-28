@@ -80,7 +80,7 @@ def load_data():
         df2 = pd.read_csv("cnbc2_complete.csv", encoding='utf-8')
         
         # Process df1 (User Login data)
-        # Convert date format to string
+        # Convert date format to string (exactly like in your original code)
         df1['date'] = pd.to_datetime(df1['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
         
         # Add age_group column based on age ranges
@@ -126,7 +126,7 @@ def load_data():
         df1['kanal_group'] = df1['kanalid'].apply(categorize_kanal)
         
         # Process df2 (User Non Login data)
-        # Convert date format to string 
+        # Convert date format to string if needed
         df2['date'] = pd.to_datetime(df2['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
         
         # Process df2 columns to match df1 structure
@@ -204,7 +204,7 @@ def calculate_metrics(df, user_login=True):
         else:
             average_session_duration = 0
         
-        total_sessions = df['Session'].sum() if 'Session' in df.columns else 0
+        total_sessions = df['Sessions'].sum() if 'Sessions' in df.columns else 0
         sessions_per_user = round(total_sessions / total_audience, 2) if total_audience > 0 else 0
         
         return {
@@ -243,12 +243,48 @@ def format_audience_range(estimated_value):
         lower_base = (estimated_value // 100) * 100
         upper_base = lower_base + 100
         return f"{lower_base:,} - {upper_base:,}"
-    else:
-        # For larger numbers, round to nearest 500 and create ±250 range
-        base = round(estimated_value / 500) * 500
-        lower = max(0, base - 250)
-        upper = base + 250
+    elif estimated_value < 100000:
+        # For numbers 10K-99K, round to nearest 1000 and create ±500 range
+        base = round(estimated_value / 1000) * 1000
+        lower = max(0, base - 500)
+        upper = base + 500
         return f"{lower:,} - {upper:,}"
+    elif estimated_value < 1000000:
+        # For numbers 100K-999K, round to nearest 5000 and create ±2500 range
+        base = round(estimated_value / 5000) * 5000
+        lower = max(0, base - 2500)
+        upper = base + 2500
+        return f"{lower:,} - {upper:,}"
+    else:
+        # For numbers 1M+, format in millions with wider range
+        value_in_millions = estimated_value / 1000000
+        
+        if value_in_millions < 10:
+            # For 1M-9.9M, round to nearest 0.1M and create ±0.1M range
+            base = round(value_in_millions * 10) / 10
+            lower = max(0, base - 0.1)
+            upper = base + 0.1
+            return f"{lower:.1f}M - {upper:.1f}M"
+        else:
+            # For 10M+, round to nearest 0.5M and create ±0.5M range
+            base = round(value_in_millions * 2) / 2
+            lower = max(0, base - 0.5)
+            upper = base + 0.5
+            return f"{lower:.1f}M - {upper:.1f}M"
+
+def format_number_display(value):
+    """Format numbers for display - show millions as M, thousands as K"""
+    if value == 0:
+        return "0"
+    elif value >= 1000000:
+        # Show in millions with 1 decimal place
+        return f"{value/1000000:.1f}M"
+    elif value >= 1000:
+        # Show in thousands with 1 decimal place  
+        return f"{value/1000:.1f}K"
+    else:
+        # Show exact number with comma formatting
+        return f"{value:,}"
 
 def predict_users_combined(daily_data, days_to_predict=1, use_last_n_days=30, user_login=True):
     """Predict users for multiple days based on historical data - supports both login and non-login data"""
@@ -309,69 +345,143 @@ def predict_users_combined(daily_data, days_to_predict=1, use_last_n_days=30, us
         
         return round(daily_prediction)
     
-    # For multiple days prediction - more aggressive overlap adjustment
+    # For multiple days prediction
     else:
-        # Calculate daily average from recent data
-        recent_avg = df_last_n['unique_users'].mean()
-        
-        # More realistic overlap factors based on user behavior analysis
-        if days_to_predict == 2:
-            overlap_factor = 0.80  # 20% overlap
-        elif days_to_predict == 3:
-            overlap_factor = 0.70  # 30% overlap
-        elif days_to_predict <= 5:
-            overlap_factor = 0.60  # 40% overlap
-        elif days_to_predict <= 7:
-            overlap_factor = 0.55  # 45% overlap
-        else:
-            overlap_factor = 0.50  # 50% overlap for longer periods
-        
-        # Method 1: Conservative daily average approach
-        conservative_estimate = recent_avg * days_to_predict * overlap_factor
-        
-        # Method 2: Historical period matching with better logic
-        if len(daily_users_df) >= days_to_predict:
-            # Get multiple similar periods for better average
-            similar_periods = []
-            for i in range(len(daily_users_df) - days_to_predict + 1):
-                period_sum = daily_users_df['unique_users'].iloc[i:i+days_to_predict].sum()
-                similar_periods.append(period_sum)
+        if user_login:
+            # Original logic for User Login (with overlap factors)
+            # Calculate daily average from recent data
+            recent_avg = df_last_n['unique_users'].mean()
             
-            if similar_periods:
-                # Use median instead of mean to reduce outlier impact
-                pattern_estimate = np.median(similar_periods) * overlap_factor
+            # More realistic overlap factors based on user behavior analysis
+            if days_to_predict == 2:
+                overlap_factor = 0.80  # 20% overlap
+            elif days_to_predict == 3:
+                overlap_factor = 0.70  # 30% overlap
+            elif days_to_predict <= 5:
+                overlap_factor = 0.60  # 40% overlap
+            elif days_to_predict <= 7:
+                overlap_factor = 0.55  # 45% overlap
+            else:
+                overlap_factor = 0.50  # 50% overlap for longer periods
+            
+            # Method 1: Conservative daily average approach
+            conservative_estimate = recent_avg * days_to_predict * overlap_factor
+            
+            # Method 2: Historical period matching with better logic
+            if len(daily_users_df) >= days_to_predict:
+                # Get multiple similar periods for better average
+                similar_periods = []
+                for i in range(len(daily_users_df) - days_to_predict + 1):
+                    period_sum = daily_users_df['unique_users'].iloc[i:i+days_to_predict].sum()
+                    similar_periods.append(period_sum)
+                
+                if similar_periods:
+                    # Use median instead of mean to reduce outlier impact
+                    pattern_estimate = np.median(similar_periods) * overlap_factor
+                else:
+                    pattern_estimate = conservative_estimate
             else:
                 pattern_estimate = conservative_estimate
+            
+            # Method 3: Minimum realistic estimate (for small audience segments)
+            min_daily = df_last_n['unique_users'].min()
+            min_estimate = min_daily * days_to_predict * (overlap_factor + 0.1)  # Slightly higher factor
+            
+            # Method 4: Recent trend-based estimate
+            if len(df_last_n) >= 3:
+                recent_3_avg = df_last_n['unique_users'].iloc[-3:].mean()
+                trend_estimate = recent_3_avg * days_to_predict * overlap_factor
+            else:
+                trend_estimate = conservative_estimate
+            
+            # Combine methods with adjusted weights (more conservative)
+            final_prediction = (
+                conservative_estimate * 0.25 +
+                pattern_estimate * 0.35 +
+                min_estimate * 0.15 +
+                trend_estimate * 0.25
+            )
+            
+            # Additional safety check: don't exceed reasonable bounds
+            max_reasonable = recent_avg * days_to_predict * 0.90  # Maximum 90% of theoretical max
+            min_reasonable = min_daily * days_to_predict * 0.40   # Minimum 40% of theoretical min
+            
+            final_prediction = min(final_prediction, max_reasonable)
+            final_prediction = max(final_prediction, min_reasonable)
+            
+            return round(final_prediction)
+        
         else:
-            pattern_estimate = conservative_estimate
-        
-        # Method 3: Minimum realistic estimate (for small audience segments)
-        min_daily = df_last_n['unique_users'].min()
-        min_estimate = min_daily * days_to_predict * (overlap_factor + 0.1)  # Slightly higher factor
-        
-        # Method 4: Recent trend-based estimate
-        if len(df_last_n) >= 3:
-            recent_3_avg = df_last_n['unique_users'].iloc[-3:].mean()
-            trend_estimate = recent_3_avg * days_to_predict * overlap_factor
-        else:
-            trend_estimate = conservative_estimate
-        
-        # Combine methods with adjusted weights (more conservative)
-        final_prediction = (
-            conservative_estimate * 0.25 +
-            pattern_estimate * 0.35 +
-            min_estimate * 0.15 +
-            trend_estimate * 0.25
-        )
-        
-        # Additional safety check: don't exceed reasonable bounds
-        max_reasonable = recent_avg * days_to_predict * 0.90  # Maximum 90% of theoretical max
-        min_reasonable = min_daily * days_to_predict * 0.40   # Minimum 40% of theoretical min
-        
-        final_prediction = min(final_prediction, max_reasonable)
-        final_prediction = max(final_prediction, min_reasonable)
-        
-        return round(final_prediction)
+            # New logic for User Non Login (aggregated total users - no overlap factors)
+            # For aggregated data, we sum the daily totals directly since they represent total activity
+            
+            # Method 1: Simple daily average * days
+            recent_avg = df_last_n['unique_users'].mean()
+            avg_based_estimate = recent_avg * days_to_predict
+            
+            # Method 2: Historical period matching (direct sum, no overlap)
+            if len(daily_users_df) >= days_to_predict:
+                similar_periods = []
+                for i in range(len(daily_users_df) - days_to_predict + 1):
+                    period_sum = daily_users_df['unique_users'].iloc[i:i+days_to_predict].sum()
+                    similar_periods.append(period_sum)
+                
+                if similar_periods:
+                    pattern_estimate = np.median(similar_periods)
+                else:
+                    pattern_estimate = avg_based_estimate
+            else:
+                pattern_estimate = avg_based_estimate
+            
+            # Method 3: Recent trend-based (last 3 days average)
+            if len(df_last_n) >= 3:
+                recent_3_avg = df_last_n['unique_users'].iloc[-3:].mean()
+                trend_estimate = recent_3_avg * days_to_predict
+            else:
+                trend_estimate = avg_based_estimate
+            
+            # Method 4: More optimistic estimate based on recent maximum
+            max_daily = df_last_n['unique_users'].max()
+            optimistic_estimate = max_daily * days_to_predict * 0.85  # 85% of theoretical max
+            
+            # Method 5: Weighted recent average (giving more weight to recent days)
+            if len(df_last_n) >= 7:
+                recent_7_days = df_last_n['unique_users'].iloc[-7:].reset_index(drop=True)
+                weights = np.array([0.05, 0.1, 0.1, 0.15, 0.15, 0.2, 0.25])  # More weight to recent days
+                weighted_recent_avg = (recent_7_days * weights).sum()
+                weighted_estimate = weighted_recent_avg * days_to_predict
+            else:
+                weighted_estimate = avg_based_estimate
+            
+            # Combine methods with adjusted weights (less conservative, more realistic)
+            final_prediction = (
+                avg_based_estimate * 0.15 +      # Reduced weight
+                pattern_estimate * 0.35 +        # Historical pattern (main weight)
+                trend_estimate * 0.20 +          # Recent trend
+                optimistic_estimate * 0.15 +     # Optimistic estimate
+                weighted_estimate * 0.15         # Weighted recent average
+            )
+            
+            # For aggregated data, adjust bounds to be less restrictive
+            min_daily = df_last_n['unique_users'].min()
+            max_daily = df_last_n['unique_users'].max()
+            
+            # More realistic bounds - not too restrictive
+            min_reasonable = min_daily * days_to_predict * 0.8  # Allow going down to 80% of min
+            max_reasonable = max_daily * days_to_predict * 1.1  # Allow going up to 110% of max
+            
+            # Also consider the average-based bounds
+            avg_min_bound = recent_avg * days_to_predict * 0.85
+            avg_max_bound = recent_avg * days_to_predict * 1.15
+            
+            # Use the less restrictive bounds
+            final_min = min(min_reasonable, avg_min_bound)
+            final_max = max(max_reasonable, avg_max_bound)
+            
+            final_prediction = max(final_prediction, final_min)
+            final_prediction = min(final_prediction, final_max)
+            
+            return round(final_prediction)
 
 def get_daily_metrics(df, last_n_days=30, user_login=True):
     """Get daily metrics for chart visualization"""
@@ -804,18 +914,30 @@ st.subheader(f"Key Metrics {metrics_period_text}")
 metric_cols = st.columns(5)
 
 with metric_cols[0]:
+    # Use formatted display for User Non Login, regular formatting for User Login
+    if st.session_state.user_login:
+        display_value = f"{filtered_metrics['unique_users']:,}"
+    else:
+        display_value = format_number_display(filtered_metrics['unique_users'])
+    
     st.markdown(f"""
     <div class='metric-card'>
         <div class='metric-label'>Total Audience:</div>
-        <div class='metric-value'>{filtered_metrics['unique_users']:,}</div>
+        <div class='metric-value'>{display_value}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with metric_cols[1]:
+    # Use formatted display for User Non Login, regular formatting for User Login
+    if st.session_state.user_login:
+        display_value = f"{filtered_metrics['total_page_views']:,}"
+    else:
+        display_value = format_number_display(filtered_metrics['total_page_views'])
+    
     st.markdown(f"""
     <div class='metric-card'>
         <div class='metric-label'>Views:</div>
-        <div class='metric-value'>{filtered_metrics['total_page_views']:,}</div>
+        <div class='metric-value'>{display_value}</div>
     </div>
     """, unsafe_allow_html=True)
 
