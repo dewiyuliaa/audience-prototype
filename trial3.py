@@ -17,7 +17,7 @@ st.markdown("""
         margin-bottom: 0;
     }
     .metric-card {
-        background-color: #0d1118ff;
+        background-color: #f0f2f6ff;
         padding: 5px;
         border-radius: 5px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -31,7 +31,7 @@ st.markdown("""
     .metric-label {
         font-family: Arial, sans-serif;
         font-size: 14px;
-        color: white;
+        color: #31333fff;
     }
     .per-day {
         text-align: right;
@@ -43,7 +43,7 @@ st.markdown("""
         font-family: Arial, sans-serif;
         font-size: 12px;
         font-style: italic;
-        color: #cccccc;
+        color: #31333fff;
     }
     .tab-container {
         display: flex;
