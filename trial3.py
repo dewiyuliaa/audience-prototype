@@ -562,6 +562,69 @@ def get_filter_options(user_login):
 # Get initial filter options
 filter_options = get_filter_options(st.session_state.user_login)
 
+# Update filter options when switching tabs, but preserve existing filters
+def update_filter_options_on_tab_switch():
+    new_filter_options = get_filter_options(st.session_state.user_login)
+    
+    # Check if current filter values are still valid for the new dataset
+    # If valid, keep them; if not, reset to empty
+    
+    # Update cities if current selection is valid
+    if "city_selector" in st.session_state:
+        current_cities = st.session_state["city_selector"]
+        valid_cities = [city for city in current_cities if city in new_filter_options['cities']]
+        st.session_state["city_selector"] = valid_cities
+    
+    # Update age groups if current selection is valid
+    if "age_selector" in st.session_state:
+        current_ages = st.session_state["age_selector"]
+        valid_ages = [age for age in current_ages if age in new_filter_options['age_groups']]
+        st.session_state["age_selector"] = valid_ages
+    
+    # Update kanal if current selection is valid
+    if "kanal_selector" in st.session_state:
+        current_kanals = st.session_state["kanal_selector"]
+        valid_kanals = [kanal for kanal in current_kanals if kanal in new_filter_options['kanals']]
+        st.session_state["kanal_selector"] = valid_kanals
+    
+    # Update devices if current selection is valid
+    if "device_selector" in st.session_state:
+        current_devices = st.session_state["device_selector"]
+        valid_devices = [device for device in current_devices if device in new_filter_options['devices']]
+        st.session_state["device_selector"] = valid_devices
+    
+    # Update categories if current selection is valid
+    if "category_selector" in st.session_state:
+        current_categories = st.session_state["category_selector"]
+        valid_categories = [cat for cat in current_categories if cat in new_filter_options['categories']]
+        st.session_state["category_selector"] = valid_categories
+    
+    # Update date range to match the new dataset's range if current range is outside
+    if "date_range_selector" in st.session_state:
+        current_range = st.session_state["date_range_selector"]
+        if len(current_range) == 2:
+            start_date_current = current_range[0]
+            end_date_current = current_range[1]
+            
+            # Check if current date range is within new dataset's range
+            if (start_date_current < new_filter_options['min_date'] or 
+                end_date_current > new_filter_options['max_date']):
+                # Reset to new dataset's full range
+                st.session_state["date_range_selector"] = [new_filter_options['min_date'], new_filter_options['max_date']]
+    
+    return new_filter_options
+
+# Initialize or update filter options
+if 'last_user_login_state' not in st.session_state:
+    st.session_state.last_user_login_state = st.session_state.user_login
+
+# Check if tab was switched
+if st.session_state.last_user_login_state != st.session_state.user_login:
+    filter_options = update_filter_options_on_tab_switch()
+    st.session_state.last_user_login_state = st.session_state.user_login
+else:
+    filter_options = get_filter_options(st.session_state.user_login)
+
 # Sidebar configuration
 st.sidebar.title("Custom Audiences")
 
@@ -969,6 +1032,87 @@ with metric_cols[4]:
 
 # Add Notes section under Key Metrics
 st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+
+# If User Non Login is selected, show User Login metrics below
+if not st.session_state.user_login:
+    # Calculate User Login metrics with same filters
+    filtered_df1 = df1.copy()
+    
+    # Apply same date filter
+    filtered_df1 = filtered_df1[(filtered_df1['date'] >= start_date_str) & 
+                               (filtered_df1['date'] <= end_date_str)]
+    
+    # Apply same filters if selections are made
+    if selected_cities:
+        filtered_df1 = filtered_df1[filtered_df1['city'].isin(selected_cities)]
+    
+    if selected_age:
+        filtered_df1 = filtered_df1[filtered_df1['age_group'].isin(selected_age)]
+    
+    if selected_genders:
+        filtered_df1 = filtered_df1[filtered_df1['sex'].isin(selected_genders)]
+    
+    if selected_kanal:
+        filtered_df1 = filtered_df1[filtered_df1['kanal_group'].isin(selected_kanal)]
+    
+    if selected_device:
+        filtered_df1 = filtered_df1[filtered_df1['device_category'].isin(selected_device)]
+    
+    if selected_categories and 'categoryauto_new_rank1' in df1.columns:
+        filtered_df1 = filtered_df1[filtered_df1['categoryauto_new_rank1'].isin(selected_categories)]
+    
+    # Calculate User Login metrics
+    user_login_metrics = calculate_metrics(filtered_df1, user_login=True)
+    
+    # Display User Login metrics
+    st.markdown(f"""
+    <div class='metric-label'>Compared to User Login {metrics_period_text}</div>
+    """, unsafe_allow_html=True)
+    metric_cols_login = st.columns(5)
+    
+    with metric_cols_login[0]:
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Total Audience:</div>
+            <div class='metric-value'>{user_login_metrics['unique_users']:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_cols_login[1]:
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Views:</div>
+            <div class='metric-value'>{user_login_metrics['total_page_views']:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_cols_login[2]:
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Views per user:</div>
+            <div class='metric-value'>{user_login_metrics['views_per_user']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with metric_cols_login[3]:
+        formatted_avg_duration_login = f"{user_login_metrics['average_session_duration']:,.2f}"
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Avg Session Duration:</div>
+            <div class='metric-value'>{formatted_avg_duration_login}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with metric_cols_login[4]:
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Sessions per user:</div>
+            <div class='metric-value'>{user_login_metrics['sessions_per_user']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Add space before notes
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
 
 # Different notes based on login type
 if st.session_state.user_login:
