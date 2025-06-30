@@ -76,21 +76,43 @@ st.markdown("""
 def load_data():
     try:
         # Read the CSV files
-        df1 = pd.read_csv("cnbc(updated).csv", encoding='utf-8')
+        df1 = pd.read_csv("cnbc(updated)2.csv", encoding='utf-8')
         df2 = pd.read_csv("cnbc2(updated).csv", encoding='utf-8')
         
         # Process df1 (User Login data)
         # Convert date format to string (exactly like in your original code)
         df1['date'] = pd.to_datetime(df1['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
         
-        # Add age_group column based on age ranges
-        df1['age_group'] = None
-        df1.loc[(df1['age'] >= 18) & (df1['age'] <= 24), 'age_group'] = "18-24"
-        df1.loc[(df1['age'] >= 25) & (df1['age'] <= 34), 'age_group'] = "25-34"
-        df1.loc[(df1['age'] >= 35) & (df1['age'] <= 44), 'age_group'] = "35-44"
-        df1.loc[(df1['age'] >= 45) & (df1['age'] <= 54), 'age_group'] = "45-54"
-        df1.loc[(df1['age'] >= 55) & (df1['age'] <= 64), 'age_group'] = "55-64"
-        df1.loc[df1['age'] >= 65, 'age_group'] = "65+"
+        # Add age_group column based on age ranges - handle mixed string/numeric data
+        def safe_age_to_group(age_value):
+            """Convert age value to age group, handling string and numeric values"""
+            if pd.isna(age_value) or age_value == 'unknown' or age_value == '':
+                return "Unknown"
+            
+            try:
+                # Try to convert to integer
+                age_int = int(float(age_value))
+                
+                if 18 <= age_int <= 24:
+                    return "18-24"
+                elif 25 <= age_int <= 34:
+                    return "25-34"
+                elif 35 <= age_int <= 44:
+                    return "35-44"
+                elif 45 <= age_int <= 54:
+                    return "45-54"
+                elif 55 <= age_int <= 64:
+                    return "55-64"
+                elif age_int >= 65:
+                    return "65+"
+                else:
+                    return "Other"  # For ages below 18 or invalid ranges
+            except (ValueError, TypeError):
+                # If conversion fails, treat as unknown
+                return "Unknown"
+        
+        # Apply the function to create age_group column
+        df1['age_group'] = df1['age'].apply(safe_age_to_group)
         
         # Define kanal_group function
         def categorize_kanal(kanalid):
@@ -549,6 +571,22 @@ def get_filter_options(user_login):
     all_kanals = sorted(current_df['kanal_group'].dropna().unique().tolist()) if 'kanal_group' in current_df.columns else []
     all_devices = sorted(current_df['device_category'].dropna().unique().tolist()) if 'device_category' in current_df.columns else []
     
+    # Handle new columns for df1
+    all_aws = []
+    all_ages_raw = []
+    all_paylater_status = []
+    
+    if user_login:  # Only for User Login (df1)
+        if 'aws' in current_df.columns:
+            all_aws = sorted(current_df['aws'].dropna().unique().tolist())
+        
+        if 'age' in current_df.columns:
+            # Get unique raw age values (for display purposes if needed)
+            all_ages_raw = sorted([str(x) for x in current_df['age'].dropna().unique().tolist()])
+        
+        if 'paylater_status' in current_df.columns:
+            all_paylater_status = sorted(current_df['paylater_status'].dropna().unique().tolist())
+    
     # Handle categoryauto_new_rank1 for both df1 and df2
     all_categories = []
     if 'categoryauto_new_rank1' in current_df.columns:
@@ -569,6 +607,9 @@ def get_filter_options(user_login):
         'kanals': all_kanals,
         'devices': all_devices,
         'categories': all_categories,
+        'aws': all_aws,
+        'ages_raw': all_ages_raw,
+        'paylater_status': all_paylater_status,
         'min_date': min_date,
         'max_date': max_date
     }
@@ -612,6 +653,14 @@ def update_filter_options_on_tab_switch():
         current_categories = st.session_state["category_selector"]
         valid_categories = [cat for cat in current_categories if cat in new_filter_options['categories']]
         st.session_state["category_selector"] = valid_categories
+    
+    # Clear User Login specific filters when switching to User Non Login
+    if not st.session_state.user_login:
+        # Clear AWS, Paylater status filters when switching to User Non Login
+        filter_keys_to_clear = ["aws_selector", "paylater_selector"]
+        for key in filter_keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
     
     # Update date range to match the new dataset's range if current range is outside
     if "date_range_selector" in st.session_state:
@@ -721,6 +770,32 @@ selected_device = st.sidebar.multiselect(
     placeholder="Choose options"
 )
 
+# Show AWS selector only for User Login
+selected_aws = []
+if st.session_state.user_login and filter_options['aws']:
+    st.sidebar.markdown("### Select Allo Wallet Status")
+    selected_aws = st.sidebar.multiselect(
+        "",
+        filter_options['aws'],
+        default=[],
+        label_visibility="collapsed",
+        key="aws_selector",
+        placeholder="Choose options"
+    )
+
+# Show Paylater Status selector only for User Login
+selected_paylater = []
+if st.session_state.user_login and filter_options['paylater_status']:
+    st.sidebar.markdown("### Select Paylater Status")
+    selected_paylater = st.sidebar.multiselect(
+        "",
+        filter_options['paylater_status'],
+        default=[],
+        label_visibility="collapsed",
+        key="paylater_selector",
+        placeholder="Choose options"
+    )
+
 # Category selector - show for both User Login and User Non Login
 st.sidebar.markdown("### Select category")
 selected_categories = st.sidebar.multiselect(
@@ -739,7 +814,7 @@ if st.sidebar.button("🔄 Reset Filters", use_container_width=True, type="secon
     filter_keys = [
         "date_range_selector", "city_selector", "age_selector", 
         "female_checkbox", "male_checkbox", "kanal_selector", 
-        "device_selector", "category_selector"
+        "device_selector", "category_selector", "aws_selector", "paylater_selector"
     ]
     
     # Also clear any gender checkboxes that might have numbered keys
@@ -759,6 +834,8 @@ if st.sidebar.button("🔄 Reset Filters", use_container_width=True, type="secon
     st.session_state["kanal_selector"] = []
     st.session_state["device_selector"] = []
     st.session_state["category_selector"] = []
+    st.session_state["aws_selector"] = []
+    st.session_state["paylater_selector"] = []
     
     # Set gender checkboxes to False for dynamic genders
     for i in range(len(filter_options['genders'])):
@@ -795,6 +872,14 @@ if selected_device:  # Check if any devices are selected
 if selected_categories and 'categoryauto_new_rank1' in current_df.columns:
     filtered_df = filtered_df[filtered_df['categoryauto_new_rank1'].isin(selected_categories)]
 
+# Apply User Login specific filters
+if st.session_state.user_login:
+    if selected_aws and 'aws' in current_df.columns:
+        filtered_df = filtered_df[filtered_df['aws'].isin(selected_aws)]
+    
+    if selected_paylater and 'paylater_status' in current_df.columns:
+        filtered_df = filtered_df[filtered_df['paylater_status'].isin(selected_paylater)]
+
 # Calculate metrics based on filtered data
 filtered_metrics = calculate_metrics(filtered_df, st.session_state.user_login)
 
@@ -821,6 +906,14 @@ if not filtered_df.empty:
     
     if selected_categories and 'categoryauto_new_rank1' in current_df.columns:
         prediction_df = prediction_df[prediction_df['categoryauto_new_rank1'].isin(selected_categories)]
+    
+    # Apply User Login specific filters
+    if st.session_state.user_login:
+        if selected_aws and 'aws' in current_df.columns:
+            prediction_df = prediction_df[prediction_df['aws'].isin(selected_aws)]
+        
+        if selected_paylater and 'paylater_status' in current_df.columns:
+            prediction_df = prediction_df[prediction_df['paylater_status'].isin(selected_paylater)]
     
     # Use all historical dates for this filtered audience segment
     if not prediction_df.empty:
@@ -989,9 +1082,6 @@ with col2:
         chart_data['formatted_date'] = pd.to_datetime(daily_chart_data['date']).dt.strftime('%d %b %Y')
         chart_data = chart_data.set_index('formatted_date')
         
-        # Debug: Show what chart type is selected
-        # st.write(f"Debug: Selected chart type is: {selected_chart}")
-        
         # Display the chart based on selection
         if selected_chart == "Line Chart":
             st.line_chart(chart_data[['audiences', 'views']])
@@ -1104,6 +1194,8 @@ if not st.session_state.user_login:
     
     if selected_categories and 'categoryauto_new_rank1' in df1.columns:
         filtered_df1 = filtered_df1[filtered_df1['categoryauto_new_rank1'].isin(selected_categories)]
+    
+    # Note: We don't apply AWS and Paylater filters here since they're only shown for User Login tab
     
     # Calculate User Login metrics
     user_login_metrics = calculate_metrics(filtered_df1, user_login=True)
