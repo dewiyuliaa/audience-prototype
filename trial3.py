@@ -11,57 +11,197 @@ st.set_page_config(page_title="Audience Insight Dashboard", layout="wide")
 # Custom CSS for styling
 st.markdown("""
 <style>
+    /* Hide Streamlit default elements */
+    .stDeployButton {display:none;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Main styling */
+    .stApp {
+        background-color: #f8fafc;
+    }
+    
     .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
+        font-size: 2.8rem;
+        font-weight: 700;
         margin-bottom: 0;
+        color: #1e293b;
+        text-align: center;
     }
+    
+    /* Enhanced metric cards */
     .metric-card {
-        background-color: #f0f2f6ff;
-        padding: 5px;
-        border-radius: 5px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 5px;
-    }
-    .metric-value {
-        font-size: 2.5rem;
-        font-weight: bold;
-        margin: 10px 0;
-    }
-    .metric-label {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        color: #31333fff;
-    }
-    .per-day {
-        text-align: right;
-        float: right;
-        margin-top: -40px;
-        color: white;
-    }
-    .estimates-text {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-        font-style: italic;
-        color: #31333fff;
-    }
-    .tab-container {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        padding: 24px 16px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+        margin-bottom: 16px;
+        text-align: center;
+        height: 140px;
         display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .tab-button {
-        background-color: #f0f2f6;
-        border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
-        cursor: pointer;
-        font-weight: bold;
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     }
-    .tab-button.active {
-        background-color: #4c78e0;
+    
+    .metric-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+        word-break: break-word;
+        color: #1e293b;
+    }
+    
+    .metric-unit {
+        font-size: 13px;
+        font-weight: 500;
+        color: #64748b;
+        margin-top: 6px;
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .metric-label {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+    }
+    
+    /* Audience size card - special styling */
+    .audience-size-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 32px 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+        margin-bottom: 24px;
+        text-align: center;
+    }
+    
+    .audience-size-label {
+        font-size: 16px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 12px;
+    }
+    
+    .audience-size-value {
+        font-size: 3rem;
+        font-weight: 700;
+        color: white;
+        margin: 0;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Reachable audience cards */
+    .reachable-card {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 3px 12px rgba(79, 70, 229, 0.3);
+        margin-bottom: 16px;
+    }
+    
+    .reachable-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.8);
+        margin-bottom: 8px;
+    }
+    
+    .reachable-value {
+        font-size: 1.8rem;
+        font-weight: 700;
         color: white;
     }
+    
+    .estimates-text {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        font-style: normal;
+        color: #6b7280;
+        line-height: 1.5;
+        margin-top: 16px;
+    }
+    
+    /* Tab styling */
+    .custom-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 32px;
+        justify-content: center;
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: #f1f5f9;
+        padding: 24px 16px;
+    }
+    
+    /* Section headers */
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 24px;
+        margin-top: 40px;
+    }
+    
+    /* Chart container */
+    .chart-container {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+        margin-bottom: 24px;
+    }
+    
+    /* Download button styling */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 12px 24px;
+        transition: all 0.2s ease;
+    }
+    
+    .stDownloadButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    /* Notes styling */
+    .notes-container {
+        background: #f8fafc;
+        border-left: 4px solid #3b82f6;
+        padding: 16px 20px;
+        border-radius: 0 8px 8px 0;
+        margin-top: 24px;
+    }
+    
+    .notes-container strong {
+        color: #1e293b;
+        font-weight: 600;
+    }
+    
+    /* Hide Streamlit branding */
     .stMultiSelect [data-baseweb=select] span {
         max-width: 200px;
         white-space: nowrap;
@@ -939,25 +1079,12 @@ daily_chart_data = get_daily_metrics(filtered_df, 30, st.session_state.user_logi
 num_days = len(daily_chart_data)
 
 # Main content
-# Create header with logo
-header_col1, header_col2 = st.columns([1, 6])
+# Create header
+st.markdown("""
+<h1 class='main-header'>Audience Insight Dashboard</h1>
+""", unsafe_allow_html=True)
 
-with header_col1:
-    # Load and display the logo
-    try:
-        logo_path = "CNBC_logo.svg.png"
-        # Expand the tilde to full path
-        import os
-        logo_path = os.path.expanduser(logo_path)
-        st.image(logo_path, width=90)  # Adjust width to fit with header
-    except Exception as e:
-        st.write("")  # Silent fail if logo not found
-
-with header_col2:
-    # Add negative margin to pull the header closer to the logo
-    st.markdown("""
-    <h1 class='main-header' style='margin-left: -35px;'>Audience Insight Dashboard</h1>
-    """, unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 32px;'></div>", unsafe_allow_html=True)
 
 # Create tabs
 tab1, tab2 = st.columns(2)
@@ -988,10 +1115,9 @@ with col1:
     audience_range = format_audience_range(estimated_audience)
     
     st.markdown(f"""
-    <div class='metric-card'>
-        <div class='metric-label'>Estimated Audience Size:</div>
-        <div class='metric-value'>{audience_range}</div>
-        <div class='estimates-text per-day'>{period_text}</div>
+    <div class='audience-size-card'>
+        <div class='audience-size-label'>Estimated Audience Size {period_text}</div>
+        <div class='audience-size-value'>{audience_range}</div>
     </div>
     <div class='estimates-text'>Estimates may vary significantly over time based on your targeting selections and available data.</div>
     """, unsafe_allow_html=True)
@@ -1005,17 +1131,17 @@ with col1:
         
         with col_email:
             st.markdown(f"""
-            <div class='metric-card'>
-                <div class='metric-label'>Email</div>
-                <div class='metric-value'>{filtered_metrics['unique_email']:,}</div>
+            <div class='reachable-card'>
+                <div class='reachable-label'>Email</div>
+                <div class='reachable-value'>{filtered_metrics['unique_email']:,}</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col_phone:
             st.markdown(f"""
-            <div class='metric-card'>
-                <div class='metric-label'>Phone Number</div>
-                <div class='metric-value'>{filtered_metrics['unique_phone']:,}</div>
+            <div class='reachable-card'>
+                <div class='reachable-label'>Phone Number</div>
+                <div class='reachable-value'>{filtered_metrics['unique_phone']:,}</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -1062,19 +1188,22 @@ with col1:
         )
 
 with col2:
-    st.subheader(f"Trend: Last {num_days} Days")
+    st.markdown(f"<h2 class='section-header'>Trend: Last {num_days} Days</h2>", unsafe_allow_html=True)
     
     # Get the current chart type selection (with proper default handling)
     if "chart_type_selector" not in st.session_state:
         st.session_state.chart_type_selector = "Area Chart"
     
-    selected_chart = st.selectbox("", ["Area Chart", "Bar Chart", "Line Chart", "Scatter Plot"], 
-                                 label_visibility="collapsed", key="chart_type_selector")
+    selected_chart = st.selectbox("Chart Type", ["Area Chart", "Bar Chart", "Line Chart", "Scatter Plot"], 
+                                 key="chart_type_selector")
     
     # Handle chart display
     if daily_chart_data.empty:
         st.info("No data available for the selected filters and date range.")
     else:
+        # Create chart container
+        st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
+        
         # Prepare chart data with actual dates as labels
         chart_data = daily_chart_data[['audiences', 'views']].copy()
         
@@ -1099,15 +1228,14 @@ with col2:
             st.pyplot(fig)
         else:  # Default to Area Chart
             st.area_chart(chart_data[['audiences', 'views']])
-
-# Add space before subheader
-st.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # Key Metrics section
 days_in_range_for_metrics = (end_date - start_date).days + 1
 metrics_period_text = f"({days_in_range_for_metrics} days)" if days_in_range_for_metrics > 1 else "(last day)"
 
-st.subheader(f"Key Metrics {metrics_period_text}")
+st.markdown(f"<h2 class='section-header'>Key Metrics {metrics_period_text}</h2>", unsafe_allow_html=True)
 metric_cols = st.columns(5)
 
 with metric_cols[0]:
@@ -1119,8 +1247,8 @@ with metric_cols[0]:
     
     st.markdown(f"""
     <div class='metric-card'>
-        <div class='metric-label'>Total Audience:</div>
         <div class='metric-value'>{display_value}</div>
+        <span class='metric-unit'>audiences</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1133,16 +1261,16 @@ with metric_cols[1]:
     
     st.markdown(f"""
     <div class='metric-card'>
-        <div class='metric-label'>Views:</div>
         <div class='metric-value'>{display_value}</div>
+        <span class='metric-unit'>views</span>
     </div>
     """, unsafe_allow_html=True)
 
 with metric_cols[2]:
     st.markdown(f"""
     <div class='metric-card'>
-        <div class='metric-label'>Views per user:</div>
         <div class='metric-value'>{filtered_metrics['views_per_user']}</div>
+        <span class='metric-unit'>views/user</span>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1151,16 +1279,16 @@ with metric_cols[3]:
     formatted_avg_duration = f"{filtered_metrics['average_session_duration']:,.2f}"
     st.markdown(f"""
     <div class='metric-card'>
-        <div class='metric-label'>Avg Session Duration:</div>
         <div class='metric-value'>{formatted_avg_duration}</div>
+        <span class='metric-unit'>seconds</span>
     </div>
     """, unsafe_allow_html=True)
 
 with metric_cols[4]:
     st.markdown(f"""
     <div class='metric-card'>
-        <div class='metric-label'>Sessions per user:</div>
         <div class='metric-value'>{filtered_metrics['sessions_per_user']}</div>
+        <span class='metric-unit'>sessions/user</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1253,7 +1381,7 @@ if not st.session_state.user_login:
 # Different notes based on login type
 if st.session_state.user_login:
     notes_text = """
-    <div class='estimates-text'>
+    <div class='notes-container'>
     <strong>Notes:</strong><br>
     • <strong>Total audience</strong> is the number of unique users who have logged in to MPC during the selected period<br>
     • <strong>Views</strong> is the total number of page views generated by all users during the selected period<br>
@@ -1264,7 +1392,7 @@ if st.session_state.user_login:
     """
 else:
     notes_text = """
-    <div class='estimates-text'>
+    <div class='notes-container'>
     <strong>Notes:</strong><br>
     • <strong>Total audience</strong> is the sum of total users who haven't logged in to MPC during the selected period<br>
     • <strong>Views</strong> is the sum of all page views generated during the selected period<br>
