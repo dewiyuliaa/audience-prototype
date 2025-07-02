@@ -242,6 +242,15 @@ st.markdown("""
         color: #1e293b;
         font-weight: 600;
     }
+    
+    /* Comparison section header */
+    .comparison-header {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 16px;
+        margin-top: 30px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -458,6 +467,17 @@ def format_audience_range(estimated_value):
         
         return f"{lower_formatted} - {upper_formatted}"
 
+def format_number_display(value):
+    """Format numbers for display - show millions as M, thousands as K"""
+    if value == 0:
+        return "0"
+    elif value >= 1000000:
+        return f"{value/1000000:.1f}M"
+    elif value >= 1000:
+        return f"{value/1000:.1f}K"
+    else:
+        return f"{value:,}"
+
 def calculate_growth_metrics(current_df, previous_df, user_login=True):
     """Calculate growth metrics compared to previous period"""
     current_metrics = calculate_metrics(current_df, user_login)
@@ -531,15 +551,6 @@ def get_previous_period_data(current_df, start_date, end_date, selected_cities, 
             previous_df = previous_df[previous_df['paylater_status'].isin(selected_paylater)]
     
     return previous_df
-    """Format numbers for display - show millions as M, thousands as K"""
-    if value == 0:
-        return "0"
-    elif value >= 1000000:
-        return f"{value/1000000:.1f}M"
-    elif value >= 1000:
-        return f"{value/1000:.1f}K"
-    else:
-        return f"{value:,}"
 
 def predict_users_combined(daily_data, days_to_predict=1, use_last_n_days=30, user_login=True):
     """Predict users for multiple days based on historical data"""
@@ -1390,49 +1401,145 @@ if not st.session_state.user_login:
     
     user_login_metrics = calculate_metrics(filtered_df1, user_login=True)
     
+    # Get previous period data for User Login comparison
+    previous_period_df1 = get_previous_period_data(
+        df1, start_date, end_date, selected_cities, selected_age,
+        selected_genders, selected_kanal, selected_device, selected_categories,
+        [], [], True  # Empty AWS and Paylater filters for comparison
+    )
+    
+    # Calculate growth metrics for User Login comparison
+    user_login_growth_metrics = calculate_growth_metrics(filtered_df1, previous_period_df1, True)
+    
     st.markdown(f"""
-    <div class='metric-label'>Compared to User Login {metrics_period_text}</div>
+    <div class='comparison-header'>Compared to User Login {metrics_period_text}</div>
     """, unsafe_allow_html=True)
+    
     metric_cols_login = st.columns(5)
     
     with metric_cols_login[0]:
+        display_value = f"{user_login_metrics['unique_users']:,}"
+        
+        # Growth indicator
+        growth_value = user_login_growth_metrics['unique_users']
+        if growth_value > 0:
+            growth_class = "growth-positive"
+            growth_icon = "▲"
+        elif growth_value < 0:
+            growth_class = "growth-negative"
+            growth_icon = "▼"
+        else:
+            growth_class = "growth-neutral"
+            growth_icon = "●"
+        
         st.markdown(f"""
         <div class='metric-card'>
-            <div class='metric-label'>Total Audience:</div>
-            <div class='metric-value'>{user_login_metrics['unique_users']:,}</div>
+            <div class='metric-value'>{display_value}</div>
+            <span class='metric-unit'>audiences</span>
+            <div class='metric-growth {growth_class}'>
+                <span class='growth-icon'>{growth_icon}</span>
+                <span>{abs(growth_value):.1f}%</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     with metric_cols_login[1]:
+        display_value = f"{user_login_metrics['total_page_views']:,}"
+        
+        # Growth indicator
+        growth_value = user_login_growth_metrics['total_page_views']
+        if growth_value > 0:
+            growth_class = "growth-positive"
+            growth_icon = "▲"
+        elif growth_value < 0:
+            growth_class = "growth-negative"
+            growth_icon = "▼"
+        else:
+            growth_class = "growth-neutral"
+            growth_icon = "●"
+        
         st.markdown(f"""
         <div class='metric-card'>
-            <div class='metric-label'>Views:</div>
-            <div class='metric-value'>{user_login_metrics['total_page_views']:,}</div>
+            <div class='metric-value'>{display_value}</div>
+            <span class='metric-unit'>views</span>
+            <div class='metric-growth {growth_class}'>
+                <span class='growth-icon'>{growth_icon}</span>
+                <span>{abs(growth_value):.1f}%</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     with metric_cols_login[2]:
+        # Growth indicator
+        growth_value = user_login_growth_metrics['views_per_user']
+        if growth_value > 0:
+            growth_class = "growth-positive"
+            growth_icon = "▲"
+        elif growth_value < 0:
+            growth_class = "growth-negative"
+            growth_icon = "▼"
+        else:
+            growth_class = "growth-neutral"
+            growth_icon = "●"
+        
         st.markdown(f"""
         <div class='metric-card'>
-            <div class='metric-label'>Views per user:</div>
             <div class='metric-value'>{user_login_metrics['views_per_user']}</div>
+            <span class='metric-unit'>views/user</span>
+            <div class='metric-growth {growth_class}'>
+                <span class='growth-icon'>{growth_icon}</span>
+                <span>{abs(growth_value):.1f}%</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
     with metric_cols_login[3]:
         formatted_avg_duration_login = f"{user_login_metrics['average_session_duration']:,.2f}"
+        
+        # Growth indicator
+        growth_value = user_login_growth_metrics['average_session_duration']
+        if growth_value > 0:
+            growth_class = "growth-positive"
+            growth_icon = "▲"
+        elif growth_value < 0:
+            growth_class = "growth-negative"
+            growth_icon = "▼"
+        else:
+            growth_class = "growth-neutral"
+            growth_icon = "●"
+        
         st.markdown(f"""
         <div class='metric-card'>
-            <div class='metric-label'>Avg Session Duration:</div>
             <div class='metric-value'>{formatted_avg_duration_login}</div>
+            <span class='metric-unit'>seconds</span>
+            <div class='metric-growth {growth_class}'>
+                <span class='growth-icon'>{growth_icon}</span>
+                <span>{abs(growth_value):.1f}%</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     with metric_cols_login[4]:
+        # Growth indicator
+        growth_value = user_login_growth_metrics['sessions_per_user']
+        if growth_value > 0:
+            growth_class = "growth-positive"
+            growth_icon = "▲"
+        elif growth_value < 0:
+            growth_class = "growth-negative"
+            growth_icon = "▼"
+        else:
+            growth_class = "growth-neutral"
+            growth_icon = "●"
+        
         st.markdown(f"""
         <div class='metric-card'>
-            <div class='metric-label'>Sessions per user:</div>
             <div class='metric-value'>{user_login_metrics['sessions_per_user']}</div>
+            <span class='metric-unit'>sessions/user</span>
+            <div class='metric-growth {growth_class}'>
+                <span class='growth-icon'>{growth_icon}</span>
+                <span>{abs(growth_value):.1f}%</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -1443,6 +1550,7 @@ if st.session_state.user_login:
     notes_text = """
     <div class='notes-container'>
     <strong>Notes:</strong><br>
+    • <strong>Growth percentage</strong> is based on the selected data period compared to the same previous period<br>
     • <strong>Total audience</strong> is the number of unique users who have logged in to MPC during the selected period<br>
     • <strong>Views</strong> is the total number of page views generated by all users during the selected period<br>
     • <strong>Views per user</strong> is the average number of pages viewed by each user (Total Views ÷ Total Users)<br>
@@ -1454,6 +1562,7 @@ else:
     notes_text = """
     <div class='notes-container'>
     <strong>Notes:</strong><br>
+    • <strong>Growth percentage</strong> is based on the selected data period compared to the same previous period<br>
     • <strong>Total audience</strong> is the sum of total users who haven't logged in to MPC during the selected period<br>
     • <strong>Views</strong> is the sum of all page views generated during the selected period<br>
     • <strong>Views per user</strong> is calculated as Total Views ÷ Total Users<br>
