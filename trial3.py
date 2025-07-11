@@ -386,7 +386,7 @@ def create_trend_chart_figure(daily_stats):
             tickfont=dict(color="#3B82F6"),
             showgrid=True,
             gridcolor='rgba(0,0,0,0.1)',
-            gridwidth=1,
+            griddash='dot',  # Change to dotted lines like age chart
             side='left'
         ),
         # Secondary y-axis (right) for Views
@@ -399,9 +399,7 @@ def create_trend_chart_figure(daily_stats):
         ),
         # X-axis
         xaxis=dict(
-            showgrid=True,
-            gridcolor='rgba(0,0,0,0.1)',
-            gridwidth=1,
+            showgrid=False,  # Remove vertical gridlines
             tickformat='%m/%d'
         )
     )
