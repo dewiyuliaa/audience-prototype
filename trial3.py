@@ -35,6 +35,379 @@ def get_logo_base64():
         # If there's any error loading the logo, return empty string
         return ""
 
+# New functions for audience size estimation
+def format_audience_range(estimated_value):
+    """Convert estimated audience to a range format with M/K formatting"""
+    if estimated_value == 0:
+        return "0"
+    
+    def format_single_value(value):
+        if value >= 1000000:
+            return f"{value/1000000:.1f}M"
+        elif value >= 1000:
+            return f"{value/1000:.1f}K"
+        else:
+            return f"{value:,}"
+    
+    if estimated_value < 10:
+        return f"{estimated_value}"
+    elif estimated_value < 100:
+        base = round(estimated_value / 10) * 10
+        lower = max(0, base - 5)
+        upper = base + 5
+        return f"{lower} - {upper}"
+    elif estimated_value < 1000:
+        base = round(estimated_value / 50) * 50
+        lower = max(0, base - 25)
+        upper = base + 25
+        return f"{lower:,} - {upper:,}"
+    elif estimated_value < 10000:
+        base = round(estimated_value / 100) * 100
+        lower = max(0, base - 100)
+        upper = base + 100
+        return f"{format_single_value(lower)} - {format_single_value(upper)}"
+    elif estimated_value < 100000:
+        base = round(estimated_value / 1000) * 1000
+        lower = max(0, base - 500)
+        upper = base + 500
+        return f"{format_single_value(lower)} - {format_single_value(upper)}"
+    elif estimated_value < 1000000:
+        base = round(estimated_value / 5000) * 5000
+        lower = max(0, base - 2500)
+        upper = base + 2500
+        return f"{format_single_value(lower)} - {format_single_value(upper)}"
+    else:
+        value_in_millions = estimated_value / 1000000
+        
+        if value_in_millions < 10:
+            base = round(value_in_millions * 10) / 10
+            lower = max(0, base - 0.1)
+            upper = base + 0.1
+            lower_formatted = f"{lower:.1f}M"
+            upper_formatted = f"{upper:.1f}M"
+        else:
+            base = round(value_in_millions * 2) / 2
+            lower = max(0, base - 0.5)
+            upper = base + 0.5
+            lower_formatted = f"{lower:.1f}M"
+            upper_formatted = f"{upper:.1f}M"
+        
+        return f"{lower_formatted} - {upper_formatted}"
+
+def format_number_display(value):
+    """Format numbers for display - show millions as M, thousands as K"""
+    if value == 0:
+        return "0"
+    elif value >= 1000000:
+        return f"{value/1000000:.1f}M"
+    elif value >= 1000:
+        return f"{value/1000:.1f}K"
+    else:
+        return f"{value:,}"
+
+def predict_users_combined(daily_data, days_to_predict=1, use_last_n_days=30, user_login=True):
+    """Predict users for multiple days based on historical data"""
+    if len(daily_data) == 0:
+        return 0
+    
+    daily_users_df = daily_data.reset_index()
+    if user_login:
+        daily_users_df.columns = ['date', 'unique_users']
+    else:
+        daily_users_df.columns = ['date', 'total_users']
+        daily_users_df['unique_users'] = daily_users_df['total_users']
+    
+    daily_users_df['date'] = pd.to_datetime(daily_users_df['date'])
+    daily_users_df = daily_users_df.sort_values('date').copy()
+    
+    if len(daily_users_df) > use_last_n_days:
+        df_last_n = daily_users_df.iloc[-use_last_n_days:].copy()
+    else:
+        df_last_n = daily_users_df.copy()
+    
+    if len(df_last_n) == 0:
+        return 0
+    
+    if days_to_predict == 1:
+        moving_avg_days = min(7, len(df_last_n))
+        last_7_avg = df_last_n['unique_users'].iloc[-moving_avg_days:].mean()
+        
+        last_7_days = df_last_n['unique_users'].iloc[-moving_avg_days:].reset_index(drop=True)
+        
+        if moving_avg_days == 7:
+            weights = np.array([0.05, 0.1, 0.1, 0.15, 0.15, 0.2, 0.25])
+        else:
+            weights = np.linspace(0.5, 1.5, moving_avg_days)
+            weights = weights / weights.sum()
+        
+        weighted_avg = (last_7_days * weights).sum()
+        last_7_median = df_last_n['unique_users'].iloc[-moving_avg_days:].median()
+        
+        daily_prediction = (last_7_avg * 0.4) + (weighted_avg * 0.4) + (last_7_median * 0.2)
+        
+        return round(daily_prediction)
+    
+    else:
+        if user_login:
+            recent_avg = df_last_n['unique_users'].mean()
+            
+            if days_to_predict == 2:
+                overlap_factor = 0.80
+            elif days_to_predict == 3:
+                overlap_factor = 0.70
+            elif days_to_predict <= 5:
+                overlap_factor = 0.60
+            elif days_to_predict <= 7:
+                overlap_factor = 0.55
+            else:
+                overlap_factor = 0.50
+            
+            conservative_estimate = recent_avg * days_to_predict * overlap_factor
+            
+            if len(daily_users_df) >= days_to_predict:
+                similar_periods = []
+                for i in range(len(daily_users_df) - days_to_predict + 1):
+                    period_sum = daily_users_df['unique_users'].iloc[i:i+days_to_predict].sum()
+                    similar_periods.append(period_sum)
+                
+                if similar_periods:
+                    pattern_estimate = np.median(similar_periods) * overlap_factor
+                else:
+                    pattern_estimate = conservative_estimate
+            else:
+                pattern_estimate = conservative_estimate
+            
+            min_daily = df_last_n['unique_users'].min()
+            min_estimate = min_daily * days_to_predict * (overlap_factor + 0.1)
+            
+            if len(df_last_n) >= 3:
+                recent_3_avg = df_last_n['unique_users'].iloc[-3:].mean()
+                trend_estimate = recent_3_avg * days_to_predict * overlap_factor
+            else:
+                trend_estimate = conservative_estimate
+            
+            final_prediction = (
+                conservative_estimate * 0.25 +
+                pattern_estimate * 0.35 +
+                min_estimate * 0.15 +
+                trend_estimate * 0.25
+            )
+            
+            max_reasonable = recent_avg * days_to_predict * 0.90
+            min_reasonable = min_daily * days_to_predict * 0.40
+            
+            final_prediction = min(final_prediction, max_reasonable)
+            final_prediction = max(final_prediction, min_reasonable)
+            
+            return round(final_prediction)
+        
+        else:
+            recent_avg = df_last_n['unique_users'].mean()
+            avg_based_estimate = recent_avg * days_to_predict
+            
+            if len(daily_users_df) >= days_to_predict:
+                similar_periods = []
+                for i in range(len(daily_users_df) - days_to_predict + 1):
+                    period_sum = daily_users_df['unique_users'].iloc[i:i+days_to_predict].sum()
+                    similar_periods.append(period_sum)
+                
+                if similar_periods:
+                    pattern_estimate = np.median(similar_periods)
+                else:
+                    pattern_estimate = avg_based_estimate
+            else:
+                pattern_estimate = avg_based_estimate
+            
+            if len(df_last_n) >= 3:
+                recent_3_avg = df_last_n['unique_users'].iloc[-3:].mean()
+                trend_estimate = recent_3_avg * days_to_predict
+            else:
+                trend_estimate = avg_based_estimate
+            
+            max_daily = df_last_n['unique_users'].max()
+            optimistic_estimate = max_daily * days_to_predict * 0.85
+            
+            if len(df_last_n) >= 7:
+                recent_7_days = df_last_n['unique_users'].iloc[-7:].reset_index(drop=True)
+                weights = np.array([0.05, 0.1, 0.1, 0.15, 0.15, 0.2, 0.25])
+                weighted_recent_avg = (recent_7_days * weights).sum()
+                weighted_estimate = weighted_recent_avg * days_to_predict
+            else:
+                weighted_estimate = avg_based_estimate
+            
+            final_prediction = (
+                avg_based_estimate * 0.15 +
+                pattern_estimate * 0.35 +
+                trend_estimate * 0.20 +
+                optimistic_estimate * 0.15 +
+                weighted_estimate * 0.15
+            )
+            
+            min_daily = df_last_n['unique_users'].min()
+            max_daily = df_last_n['unique_users'].max()
+            
+            min_reasonable = min_daily * days_to_predict * 0.8
+            max_reasonable = max_daily * days_to_predict * 1.1
+            
+            avg_min_bound = recent_avg * days_to_predict * 0.85
+            avg_max_bound = recent_avg * days_to_predict * 1.15
+            
+            final_min = min(min_reasonable, avg_min_bound)
+            final_max = max(max_reasonable, avg_max_bound)
+            
+            final_prediction = max(final_prediction, final_min)
+            final_prediction = min(final_prediction, final_max)
+            
+            return round(final_prediction)
+
+def create_trend_chart(filtered_df, user_login=True, days_to_show=30):
+    """Create trend chart showing last 30 days of data"""
+    # Ensure we have date column
+    if 'date' not in filtered_df.columns:
+        return go.Figure()
+    
+    # Get daily data for the specified period
+    end_date = pd.to_datetime(filtered_df['date'].max())
+    start_date = end_date - timedelta(days=days_to_show-1)
+    
+    # Filter data for the trend period
+    trend_data = filtered_df[pd.to_datetime(filtered_df['date']) >= start_date].copy()
+    trend_data['date'] = pd.to_datetime(trend_data['date'])
+    
+    if user_login:
+        # For user login data, use correct column names: 'user_id' and 'page_views'
+        agg_dict = {}
+        
+        # Check for user column (user_id or userid)
+        if 'user_id' in trend_data.columns:
+            agg_dict['user_id'] = 'nunique'
+            user_col = 'user_id'
+        elif 'userid' in trend_data.columns:
+            agg_dict['userid'] = 'nunique'
+            user_col = 'userid'
+        else:
+            # Fallback: count rows
+            daily_stats = trend_data.groupby('date').size().reset_index()
+            daily_stats.columns = ['date', 'unique_users']
+            daily_stats['total_pageviews'] = daily_stats['unique_users'] * 2
+            return create_trend_chart_figure(daily_stats)
+        
+        # Check for pageviews column (page_views or pageviews)
+        if 'page_views' in trend_data.columns:
+            agg_dict['page_views'] = 'sum'
+            views_col = 'page_views'
+        elif 'pageviews' in trend_data.columns:
+            agg_dict['pageviews'] = 'sum'
+            views_col = 'pageviews'
+        else:
+            # Estimate pageviews as 2x users
+            views_col = None
+        
+        daily_stats = trend_data.groupby('date').agg(agg_dict).reset_index()
+        
+        # Rename columns for consistency
+        if len(daily_stats.columns) == 3:  # date + user + views
+            daily_stats.columns = ['date', 'unique_users', 'total_pageviews']
+        else:  # date + user only
+            daily_stats.columns = ['date', 'unique_users']
+            daily_stats['total_pageviews'] = daily_stats['unique_users'] * 2
+            
+    else:
+        # For non-login data, use Total users column if available
+        if 'Total users' in trend_data.columns:
+            daily_stats = trend_data.groupby('date').agg({
+                'Total users': 'sum',
+                'Views': 'sum' if 'Views' in trend_data.columns else 'count'
+            }).reset_index()
+            daily_stats.columns = ['date', 'unique_users', 'total_pageviews']
+        else:
+            # Fallback: count rows as proxy for users
+            daily_stats = trend_data.groupby('date').size().reset_index()
+            daily_stats.columns = ['date', 'unique_users']
+            daily_stats['total_pageviews'] = daily_stats['unique_users'] * 2  # Rough estimate
+    
+    return create_trend_chart_figure(daily_stats)
+
+def create_trend_chart_figure(daily_stats):
+    """Helper function to create the actual trend chart figure"""
+    # Create the trend chart
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=('Audience', 'Views'),
+        vertical_spacing=0.15,
+        row_heights=[0.5, 0.5]
+    )
+    
+    # Add audience trend line
+    fig.add_trace(
+        go.Scatter(
+            x=daily_stats['date'],
+            y=daily_stats['unique_users'],
+            mode='lines+markers',
+            name='Audience',
+            line=dict(color='#3B82F6', width=3),
+            marker=dict(size=4),
+            hovertemplate='Date: %{x}<br>Audience: %{y:,}<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # Add views trend line
+    fig.add_trace(
+        go.Scatter(
+            x=daily_stats['date'],
+            y=daily_stats['total_pageviews'],
+            mode='lines+markers',
+            name='Views',
+            line=dict(color='#06B6D4', width=3),
+            marker=dict(size=4),
+            hovertemplate='Date: %{x}<br>Views: %{y:,}<extra></extra>'
+        ),
+        row=2, col=1
+    )
+    
+    # Update layout
+    fig.update_layout(
+        height=400,
+        margin=dict(l=0, r=0, t=30, b=0),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        showlegend=False,
+        font=dict(size=12)
+    )
+    
+    # Update x-axes
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor='rgba(0,0,0,0.1)',
+        gridwidth=1,
+        tickformat='%m/%d',
+        row=1, col=1
+    )
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor='rgba(0,0,0,0.1)',
+        gridwidth=1,
+        tickformat='%m/%d',
+        row=2, col=1
+    )
+    
+    # Update y-axes
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor='rgba(0,0,0,0.1)',
+        gridwidth=1,
+        row=1, col=1
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor='rgba(0,0,0,0.1)',
+        gridwidth=1,
+        row=2, col=1
+    )
+    
+    return fig
+
 # Load and process data
 @st.cache_data
 def load_data():
@@ -503,6 +876,39 @@ st.markdown("""
         box-shadow: none !important;
         background: transparent !important;
         border: none !important;
+    }
+    
+    /* Audience Size Card Styling */
+    .audience-size-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 24px;
+        border-radius: 16px;
+        color: white;
+        margin-bottom: 20px;
+    }
+    
+    .audience-size-title {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+        opacity: 0.9;
+    }
+    
+    .audience-size-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 16px 0;
+    }
+    
+    .audience-size-subtitle {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        margin-bottom: 16px;
+    }
+    
+    .audience-size-disclaimer {
+        font-size: 0.85rem;
+        opacity: 0.7;
+        line-height: 1.4;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1176,6 +1582,69 @@ if not filtered_df.empty:
         
         st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
         st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
+        
+        # NEW SECTION: Audience Size Estimation and Trend
+        st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+        
+        # Calculate audience size estimation
+        if st.session_state.user_login:
+            # For User Login: count unique users using correct column name
+            if 'user_id' in filtered_df.columns:
+                unique_users = filtered_df['user_id'].nunique()
+                # Create daily data for prediction
+                daily_users = filtered_df.groupby('date')['user_id'].nunique()
+            elif 'userid' in filtered_df.columns:
+                unique_users = filtered_df['userid'].nunique()
+                daily_users = filtered_df.groupby('date')['userid'].nunique()
+            else:
+                unique_users = len(filtered_df)
+                daily_users = filtered_df.groupby('date').size()
+        else:
+            # For User Non Login: use Total users if available
+            if 'Total users' in filtered_df.columns:
+                unique_users = filtered_df['Total users'].sum()
+                daily_users = filtered_df.groupby('date')['Total users'].sum()
+            else:
+                unique_users = len(filtered_df)
+                daily_users = filtered_df.groupby('date').size()
+        
+        # Calculate days in current period
+        current_period_days = (end_date - start_date).days + 1
+        
+        # Predict audience for the period
+        if len(daily_users) > 0:
+            predicted_audience = predict_users_combined(
+                daily_users, 
+                days_to_predict=current_period_days, 
+                user_login=st.session_state.user_login
+            )
+        else:
+            predicted_audience = unique_users
+        
+        # Format the audience range
+        audience_range = format_audience_range(predicted_audience)
+        
+        # Create two columns for Audience Size and Trend
+        size_col, trend_col = st.columns([1, 2])
+        
+        with size_col:
+            # Audience Size Card
+            st.markdown(f"""
+            <div class="audience-size-card">
+                <div class="audience-size-title">Audience Size</div>
+                <div class="audience-size-subtitle">Estimated Audience Size ({current_period_days} days)</div>
+                <div class="audience-size-value">{audience_range}</div>
+                <div class="audience-size-disclaimer">
+                    Estimates may vary significantly over time based on your targeting selections and available data.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with trend_col:
+            # Trend Chart
+            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Trend: Last 30 Days</h3>", unsafe_allow_html=True)
+            trend_fig = create_trend_chart(filtered_df, st.session_state.user_login, days_to_show=30)
+            st.plotly_chart(trend_fig, use_container_width=True, key="trend_chart")
 
 else:
     st.info("No data available for the selected filters and date range.")
