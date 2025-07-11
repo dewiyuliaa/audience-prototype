@@ -330,80 +330,78 @@ def create_trend_chart(filtered_df, user_login=True, days_to_show=30):
 
 def create_trend_chart_figure(daily_stats):
     """Helper function to create the actual trend chart figure"""
-    # Create the trend chart
-    fig = make_subplots(
-        rows=2, cols=1,
-        subplot_titles=('Audience', 'Views'),
-        vertical_spacing=0.15,
-        row_heights=[0.5, 0.5]
-    )
+    # Create combo chart with secondary y-axis
+    fig = go.Figure()
     
-    # Add audience trend line
+    # Add audience bars (left y-axis)
     fig.add_trace(
-        go.Scatter(
+        go.Bar(
             x=daily_stats['date'],
             y=daily_stats['unique_users'],
-            mode='lines+markers',
             name='Audience',
-            line=dict(color='#3B82F6', width=3),
-            marker=dict(size=4),
-            hovertemplate='Date: %{x}<br>Audience: %{y:,}<extra></extra>'
-        ),
-        row=1, col=1
+            marker=dict(
+                color='rgba(59, 130, 246, 0.7)',
+                line=dict(color='rgba(59, 130, 246, 1)', width=1)
+            ),
+            hovertemplate='Date: %{x}<br>Audience: %{y:,}<extra></extra>',
+            yaxis='y'
+        )
     )
     
-    # Add views trend line
+    # Add views line (right y-axis)
     fig.add_trace(
         go.Scatter(
             x=daily_stats['date'],
             y=daily_stats['total_pageviews'],
             mode='lines+markers',
             name='Views',
-            line=dict(color='#06B6D4', width=3),
-            marker=dict(size=4),
-            hovertemplate='Date: %{x}<br>Views: %{y:,}<extra></extra>'
-        ),
-        row=2, col=1
+            line=dict(color='#EF4444', width=3),
+            marker=dict(size=6, color='#EF4444'),
+            hovertemplate='Date: %{x}<br>Views: %{y:,}<extra></extra>',
+            yaxis='y2'
+        )
     )
     
-    # Update layout
+    # Update layout with dual y-axes
     fig.update_layout(
-        height=400,
+        height=300,
         margin=dict(l=0, r=0, t=30, b=0),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        showlegend=False,
-        font=dict(size=12)
-    )
-    
-    # Update x-axes
-    fig.update_xaxes(
-        showgrid=True,
-        gridcolor='rgba(0,0,0,0.1)',
-        gridwidth=1,
-        tickformat='%m/%d',
-        row=1, col=1
-    )
-    fig.update_xaxes(
-        showgrid=True,
-        gridcolor='rgba(0,0,0,0.1)',
-        gridwidth=1,
-        tickformat='%m/%d',
-        row=2, col=1
-    )
-    
-    # Update y-axes
-    fig.update_yaxes(
-        showgrid=True,
-        gridcolor='rgba(0,0,0,0.1)',
-        gridwidth=1,
-        row=1, col=1
-    )
-    fig.update_yaxes(
-        showgrid=True,
-        gridcolor='rgba(0,0,0,0.1)',
-        gridwidth=1,
-        row=2, col=1
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=12)
+        ),
+        font=dict(size=12),
+        # Primary y-axis (left) for Audience
+        yaxis=dict(
+            title=dict(text="Audience", font=dict(color="#3B82F6")),
+            tickfont=dict(color="#3B82F6"),
+            showgrid=True,
+            gridcolor='rgba(0,0,0,0.1)',
+            gridwidth=1,
+            side='left'
+        ),
+        # Secondary y-axis (right) for Views
+        yaxis2=dict(
+            title=dict(text="Views", font=dict(color="#EF4444")),
+            tickfont=dict(color="#EF4444"),
+            overlaying='y',
+            side='right',
+            showgrid=False
+        ),
+        # X-axis
+        xaxis=dict(
+            showgrid=True,
+            gridcolor='rgba(0,0,0,0.1)',
+            gridwidth=1,
+            tickformat='%m/%d'
+        )
     )
     
     return fig
