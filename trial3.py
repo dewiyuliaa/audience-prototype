@@ -1333,7 +1333,7 @@ if not filtered_df.empty:
                 values=gender_percentages,
                 hole=0.5,
                 marker=dict(
-                    colors=['rgba(79, 70, 229, 0.8)', 'rgba(6, 182, 212, 0.8)', 'rgba(16, 185, 129, 0.8)'],
+                    colors=['rgba(79, 70, 229, 0.8)', 'rgba(79, 70, 229, 0.5)'],
                     line=dict(color='rgba(255,255,255,0.8)', width=2)
                 ),
                 textinfo='none',
