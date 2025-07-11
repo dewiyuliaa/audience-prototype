@@ -444,7 +444,11 @@ def load_data():
         df1['age_group'] = df1['age'].apply(safe_age_to_group)
         
         # Define kanal_group function
-        def categorize_kanal(kanalid):
+        def categorize_kanal(kanalid, page_url=None):
+            # First check page URL if provided
+            if page_url == "https://www.cnbcindonesia.com/":
+                return "WP"
+            
             if pd.isna(kanalid):
                 return "Other"
             
@@ -473,7 +477,11 @@ def load_data():
             else:
                 return "Other"
         
-        df1['kanal_group'] = df1['kanalid'].apply(categorize_kanal)
+        # Apply kanal categorization with page check if page column exists
+        if 'page' in df1.columns:
+            df1['kanal_group'] = df1.apply(lambda row: categorize_kanal(row['kanalid'], row.get('page')), axis=1)
+        else:
+            df1['kanal_group'] = df1['kanalid'].apply(lambda x: categorize_kanal(x))
         
         # Process df2 (User Non Login data)
         df2['date'] = pd.to_datetime(df2['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
@@ -494,9 +502,43 @@ def load_data():
         if 'City' in df2.columns:
             df2['city'] = df2['City']
         
-        # Map Kanal ID and categorize
+        # Map Kanal ID and categorize with page check if available
         if 'Kanal ID' in df2.columns:
-            df2['kanal_group'] = df2['Kanal ID'].apply(categorize_kanal)
+            # Define the categorize_kanal function for df2 (User Non Login)
+            def categorize_kanal_df2(kanalid):
+                if pd.isna(kanalid):
+                    return "Other"
+                
+                kanalid_str = str(kanalid)
+                
+                # Special case for df2: kanalid "2" = "WP"
+                if kanalid_str == "2":
+                    return "WP"
+                elif kanalid_str.startswith("2-3"):
+                    return "News"
+                elif kanalid_str.startswith("2-5"):
+                    return "Market"
+                elif kanalid_str.startswith("2-9"):
+                    return "Entrepreneur"
+                elif kanalid_str.startswith("2-12"):
+                    return "Tech"
+                elif kanalid_str.startswith("2-11"):
+                    return "Lifestyle"
+                elif kanalid_str.startswith("2-10"):
+                    return "Syariah"
+                elif kanalid_str.startswith("2-13"):
+                    return "Opini"
+                elif kanalid_str.startswith("2-71"):
+                    return "MyMoney"
+                elif kanalid_str.startswith("2-78"):
+                    return "Cuap Cuap Cuan"
+                elif kanalid_str.startswith("2-127"):
+                    return "Research"
+                else:
+                    return "Other"
+            
+            # Apply kanal categorization for df2
+            df2['kanal_group'] = df2['Kanal ID'].apply(categorize_kanal_df2)
         
         return df1, df2
     
@@ -631,11 +673,13 @@ def create_city_chart(df, user_login=True):
     if user_login:
         city_data = df['city'].value_counts().head(5)
     else:
-        # For User Non Login, use Total users for weighting
+        # For User Non Login, exclude "(not set)", get top 5 by total users, and sort by largest
         if 'Total users' in df.columns:
-            city_data = df.groupby('city')['Total users'].sum().head(5)
+            filtered_cities = df[df['city'] != '(not set)']
+            city_data = filtered_cities.groupby('city')['Total users'].sum().nlargest(5)
         else:
-            city_data = df['city'].value_counts().head(5)
+            filtered_cities = df[df['city'] != '(not set)']
+            city_data = filtered_cities['city'].value_counts().head(5)
     
     # Calculate percentages
     total = city_data.sum()
@@ -796,17 +840,27 @@ def get_filter_options(user_login):
         if user_login:
             top_cities = current_df['city'].value_counts().head(10).index.tolist()
         else:
+            # For User Non Login, exclude "(not set)" and use Total users for weighting
             if 'Total users' in current_df.columns:
-                top_cities = current_df.groupby('city')['Total users'].sum().nlargest(10).index.tolist()
+                filtered_cities = current_df[current_df['city'] != '(not set)']
+                top_cities = filtered_cities.groupby('city')['Total users'].sum().nlargest(10).index.tolist()
             else:
-                top_cities = current_df['city'].value_counts().head(10).index.tolist()
+                filtered_cities = current_df[current_df['city'] != '(not set)']
+                top_cities = filtered_cities['city'].value_counts().head(10).index.tolist()
         all_cities = sorted(top_cities)
     else:
         all_cities = []
     
     all_age_groups = sorted(current_df['age_group'].dropna().unique().tolist()) if 'age_group' in current_df.columns else []
     all_genders = sorted(current_df['sex'].dropna().unique().tolist()) if 'sex' in current_df.columns else []
-    all_kanals = sorted(current_df['kanal_group'].dropna().unique().tolist()) if 'kanal_group' in current_df.columns else []
+    
+    # Get kanal groups and exclude "Other"
+    if 'kanal_group' in current_df.columns:
+        all_kanals_raw = sorted(current_df['kanal_group'].dropna().unique().tolist())
+        all_kanals = [kanal for kanal in all_kanals_raw if kanal != 'Other']
+    else:
+        all_kanals = []
+    
     all_devices = sorted(current_df['device_category'].dropna().unique().tolist()) if 'device_category' in current_df.columns else []
     
     all_aws = []
@@ -1378,66 +1432,71 @@ if not filtered_df.empty:
     if 'kanal_group' in filtered_df.columns and not filtered_df['kanal_group'].isna().all():
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         
-        # Create kanal chart
+        # Create kanal chart (exclude "Other" category)
         if st.session_state.user_login:
-            kanal_data = filtered_df['kanal_group'].value_counts()
+            kanal_data = filtered_df[filtered_df['kanal_group'] != 'Other']['kanal_group'].value_counts()
         else:
             # For User Non Login, use Total users for weighting
             if 'Total users' in filtered_df.columns:
-                kanal_data = filtered_df.groupby('kanal_group')['Total users'].sum()
+                kanal_data = filtered_df[filtered_df['kanal_group'] != 'Other'].groupby('kanal_group')['Total users'].sum()
             else:
-                kanal_data = filtered_df['kanal_group'].value_counts()
+                kanal_data = filtered_df[filtered_df['kanal_group'] != 'Other']['kanal_group'].value_counts()
         
-        # Calculate percentages
-        total = kanal_data.sum()
-        percentages = (kanal_data / total * 100) if total > 0 else kanal_data * 0
-        
-        # Create the chart
-        kanal_fig = go.Figure()
-        
-        # Add bars with gradient effect
-        for i, (kanal, pct) in enumerate(zip(kanal_data.index, percentages)):
-            kanal_fig.add_trace(go.Bar(
-                x=[kanal],
-                y=[pct],
-                marker=dict(
-                    color=f'rgba(245, 158, 11, {1 - i*0.1})',
-                    cornerradius=4,
-                    line=dict(width=0),
-                    pattern=dict(
-                        shape='',
-                        bgcolor=f'rgba(245, 158, 11, 0.2)',
-                        fgcolor=f'rgba(245, 158, 11, {1 - i*0.05})'
-                    )
+        # Only show chart if there's data after excluding "Other"
+        if len(kanal_data) > 0:
+            # Sort data from largest to smallest
+            kanal_data = kanal_data.sort_values(ascending=False)
+            
+            # Calculate percentages
+            total = kanal_data.sum()
+            percentages = (kanal_data / total * 100) if total > 0 else kanal_data * 0
+            
+            # Create the chart
+            kanal_fig = go.Figure()
+            
+            # Add bars with gradient effect
+            for i, (kanal, pct) in enumerate(zip(kanal_data.index, percentages)):
+                kanal_fig.add_trace(go.Bar(
+                    x=[kanal],
+                    y=[pct],
+                    marker=dict(
+                        color=f'rgba(245, 158, 11, {1 - i*0.1})',
+                        cornerradius=4,
+                        line=dict(width=0),
+                        pattern=dict(
+                            shape='',
+                            bgcolor=f'rgba(245, 158, 11, 0.2)',
+                            fgcolor=f'rgba(245, 158, 11, {1 - i*0.05})'
+                        )
+                    ),
+                    text=f'{pct:.1f}%',
+                    textposition='outside',
+                    hovertemplate=f'Kanal: {kanal}<br>Percentage: {pct:.1f}%<extra></extra>',
+                    showlegend=False
+                ))
+            
+            kanal_fig.update_layout(
+                xaxis_title="",
+                yaxis_title="Percentage",
+                showlegend=False,
+                height=280,
+                margin=dict(l=0, r=0, t=0, b=0),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                xaxis=dict(
+                    tickangle=45,
+                    gridcolor='rgba(0,0,0,0.1)',
+                    griddash='dot'
                 ),
-                text=f'{pct:.1f}%',
-                textposition='outside',
-                hovertemplate=f'Kanal: {kanal}<br>Percentage: {pct:.1f}%<extra></extra>',
-                showlegend=False
-            ))
-        
-        kanal_fig.update_layout(
-            xaxis_title="",
-            yaxis_title="Percentage",
-            showlegend=False,
-            height=280,
-            margin=dict(l=0, r=0, t=0, b=0),
-            plot_bgcolor='white',
-            paper_bgcolor='white',
-            xaxis=dict(
-                tickangle=45,
-                gridcolor='rgba(0,0,0,0.1)',
-                griddash='dot'
-            ),
-            yaxis=dict(
-                range=[0, max(percentages) * 1.15] if len(percentages) > 0 else [0, 100],
-                gridcolor='rgba(0,0,0,0.1)',
-                griddash='dot'
+                yaxis=dict(
+                    range=[0, max(percentages) * 1.15] if len(percentages) > 0 else [0, 100],
+                    gridcolor='rgba(0,0,0,0.1)',
+                    griddash='dot'
+                )
             )
-        )
-        
-        st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
-        st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
+            
+            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
+            st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
         
         # NEW SECTION: Audience Size Estimation and Trend
         st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
