@@ -107,18 +107,23 @@ def load_data():
         # Process df2 (User Non Login data)
         df2['date'] = pd.to_datetime(df2['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
         
+        # Map Gender column to sex for consistency
         if 'Gender' in df2.columns:
             df2['sex'] = df2['Gender'].str.lower()
         
+        # Use Age column directly as age_group for df2
         if 'Age' in df2.columns:
             df2['age_group'] = df2['Age']
         
+        # Map Device category for consistency
         if 'Device category' in df2.columns:
             df2['device_category'] = df2['Device category']
         
+        # Map City for consistency
         if 'City' in df2.columns:
             df2['city'] = df2['City']
         
+        # Map Kanal ID and categorize
         if 'Kanal ID' in df2.columns:
             df2['kanal_group'] = df2['Kanal ID'].apply(categorize_kanal)
         
@@ -502,49 +507,95 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Create full-width header with clickable navigation
-header_html = f"""
-<div class="tiktok-header">
-    <div class="header-title">Prototype Audience Insight</div>
-    <div class="header-nav">
-        <div class="nav-item {'active' if st.session_state.user_login else ''}" id="login-nav">User Login</div>
-        <div class="nav-item {'active' if not st.session_state.user_login else ''}" id="non-login-nav">User Non Login</div>
+# Create navigation with black header styling
+st.markdown("""
+<div style='background-color: #1a1a1a; margin: -1rem -100vw 1rem -100vw; padding: 12px 100vw; min-height: 60px; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between;'>
+    <div style='color: white; font-size: 1.2rem; font-weight: 600; padding-left: 24px;'>
+        Prototype Audience Insight
     </div>
 </div>
-"""
+""", unsafe_allow_html=True)
 
-st.markdown(header_html, unsafe_allow_html=True)
-
-# Check for URL parameters to handle navigation
-query_params = st.query_params
-if "mode" in query_params:
-    if query_params["mode"] == "login" and not st.session_state.user_login:
-        st.session_state.user_login = True
-        st.rerun()
-    elif query_params["mode"] == "non_login" and st.session_state.user_login:
-        st.session_state.user_login = False
-        st.rerun()
-
-# Add JavaScript for navigation functionality
-st.markdown("""
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const loginNav = document.getElementById('login-nav');
-    const nonLoginNav = document.getElementById('non-login-nav');
+# Create navigation buttons in a container that looks like the header
+nav_container = st.container()
+with nav_container:
+    # Position the buttons in the top right
+    col1, col2, col3, col4 = st.columns([5, 1.2, 1.4, 0.5])
     
-    if (loginNav) {
-        loginNav.addEventListener('click', function() {
-            window.location.search = '?mode=login';
-        });
-    }
-    
-    if (nonLoginNav) {
-        nonLoginNav.addEventListener('click', function() {
-            window.location.search = '?mode=non_login';
-        });
-    }
-});
-</script>
+    with col2:
+        if st.button("User Login", 
+                     key="login_nav_btn", 
+                     use_container_width=True):
+            if not st.session_state.user_login:
+                st.session_state.user_login = True
+                st.rerun()
+
+    with col3:
+        if st.button("User Non Login", 
+                     key="non_login_nav_btn", 
+                     use_container_width=True):
+            if st.session_state.user_login:
+                st.session_state.user_login = False
+                st.rerun()
+
+# Add CSS to style the buttons and position them like the original header - REMOVED RED LINES
+st.markdown(f"""
+<style>
+/* Position the navigation buttons to overlay on the black header */
+.stButton {{
+    position: relative;
+    margin-top: -80px;
+    z-index: 999;
+}}
+
+/* Style buttons to look like header navigation tabs - NO RED BORDER */
+.stButton > button {{
+    background-color: transparent !important;
+    border: none !important;
+    color: #9ca3af !important;
+    padding: 8px 20px !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    border-bottom: none !important;
+    transition: all 0.2s ease !important;
+    height: 45px !important;
+}}
+
+.stButton > button:hover {{
+    color: #e5e7eb !important;
+    background-color: transparent !important;
+    border: none !important;
+}}
+
+/* Active state styling - NO RED BORDER */
+.stButton > button[aria-pressed="true"] {{
+    color: white !important;
+    border-bottom: none !important;
+    background-color: transparent !important;
+}}
+
+/* Style for User Login button - First button (col2) */
+div[data-testid="column"]:nth-child(2) .stButton > button {{
+    color: {'white' if st.session_state.user_login else '#9ca3af'} !important;
+    border-bottom: none !important;
+}}
+
+/* Style for User Non Login button - Second button (col3) */
+div[data-testid="column"]:nth-child(3) .stButton > button {{
+    color: {'white' if not st.session_state.user_login else '#9ca3af'} !important;
+    border-bottom: none !important;
+}}
+
+.stButton > button:focus {{
+    outline: none !important;
+    box-shadow: none !important;
+}}
+
+/* Adjust the main content margin */
+.block-container {{
+    margin-top: 20px !important;
+}}
+</style>
 """, unsafe_allow_html=True)
 
 # Chart functions
@@ -555,9 +606,10 @@ def create_age_comparison_chart(filtered_df, original_df, user_login=True):
         selected_age_data = filtered_df['age_group'].value_counts()
         original_age_data = original_df['age_group'].value_counts()
     else:
-        if 'Age' in filtered_df.columns:
-            selected_age_data = filtered_df.groupby('Age')['Total users'].sum() if 'Total users' in filtered_df.columns else filtered_df['Age'].value_counts()
-            original_age_data = original_df.groupby('Age')['Total users'].sum() if 'Total users' in original_df.columns else original_df['Age'].value_counts()
+        # For User Non Login, use Age column and Total users for weighting
+        if 'Total users' in filtered_df.columns:
+            selected_age_data = filtered_df.groupby('age_group')['Total users'].sum()
+            original_age_data = original_df.groupby('age_group')['Total users'].sum()
         else:
             selected_age_data = filtered_df['age_group'].value_counts()
             original_age_data = original_df['age_group'].value_counts()
@@ -654,9 +706,10 @@ def create_city_comparison_chart(filtered_df, original_df, user_login=True):
         selected_city_data = filtered_df['city'].value_counts().head(10)
         original_city_data = original_df['city'].value_counts().head(10)
     else:
-        if 'City' in filtered_df.columns:
-            selected_city_data = filtered_df.groupby('City')['Total users'].sum().head(10) if 'Total users' in filtered_df.columns else filtered_df['City'].value_counts().head(10)
-            original_city_data = original_df.groupby('City')['Total users'].sum().head(10) if 'Total users' in original_df.columns else original_df['City'].value_counts().head(10)
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in filtered_df.columns:
+            selected_city_data = filtered_df.groupby('city')['Total users'].sum().head(10)
+            original_city_data = original_df.groupby('city')['Total users'].sum().head(10)
         else:
             selected_city_data = filtered_df['city'].value_counts().head(10)
             original_city_data = original_df['city'].value_counts().head(10)
@@ -749,10 +802,9 @@ def create_gender_chart(df, user_login=True):
     if user_login:
         gender_data = df['sex'].value_counts()
     else:
-        if 'Gender' in df.columns:
-            gender_data = df.groupby('Gender')['Total users'].sum() if 'Total users' in df.columns else df['Gender'].value_counts()
-            # Convert to lowercase to match format
-            gender_data.index = gender_data.index.str.lower()
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in df.columns:
+            gender_data = df.groupby('sex')['Total users'].sum()
         else:
             gender_data = df['sex'].value_counts()
     
@@ -789,8 +841,9 @@ def create_device_chart(df, user_login=True):
     if user_login:
         device_data = df['device_category'].value_counts()
     else:
-        if 'Device category' in df.columns:
-            device_data = df.groupby('Device category')['Total users'].sum() if 'Total users' in df.columns else df['Device category'].value_counts()
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in df.columns:
+            device_data = df.groupby('device_category')['Total users'].sum()
         else:
             device_data = df['device_category'].value_counts()
     
@@ -898,27 +951,32 @@ with tab_col2:
     """, unsafe_allow_html=True)
 
 with data_col:
-    # Generate CSV data for potential download
-    csv_data, contact_count = auto_download_csv(filtered_df)
-    
-    if csv_data:
-        # Direct download button styled as Export contact button
-        st.download_button(
-            label="⬇️ Export contact",
-            data=csv_data,
-            file_name="contact_list.csv",
-            mime="text/csv",
-            key="direct_download",
-            help="Download contact data",
-            use_container_width=False
-        )
+    # Only show Export contact for User Login mode
+    if st.session_state.user_login:
+        # Generate CSV data for potential download
+        csv_data, contact_count = auto_download_csv(filtered_df)
+        
+        if csv_data:
+            # Direct download button styled as Export contact button
+            st.download_button(
+                label="⬇️ Export contact",
+                data=csv_data,
+                file_name="contact_list.csv",
+                mime="text/csv",
+                key="direct_download",
+                help="Download contact data",
+                use_container_width=False
+            )
+        else:
+            # Show regular button if no data available
+            if st.button("⬇️ Export contact", key="data_btn", help="Download contact data"):
+                if not filtered_df.empty:
+                    st.warning("❌ No contact data (full_name, email, phone_number) available in the current dataset.")
+                else:
+                    st.error("❌ No data available for the selected filters.")
     else:
-        # Show regular button if no data available
-        if st.button("⬇️ Export contact", key="data_btn", help="Download contact data"):
-            if not filtered_df.empty:
-                st.warning("❌ No contact data (full_name, email, phone_number) available in the current dataset.")
-            else:
-                st.error("❌ No data available for the selected filters.")
+        # For User Non Login, show empty space or alternative content
+        st.markdown("")
 
 # Remove the download handling section since we're using direct download
 # Initialize download trigger state
@@ -953,9 +1011,8 @@ if not filtered_df.empty:
             if st.session_state.user_login:
                 original_gender_data = df1['sex'].value_counts()
             else:
-                if 'Gender' in df2.columns:
-                    original_gender_data = df2.groupby('Gender')['Total users'].sum() if 'Total users' in df2.columns else df2['Gender'].value_counts()
-                    original_gender_data.index = original_gender_data.index.str.lower()
+                if 'Total users' in df2.columns:
+                    original_gender_data = df2.groupby('sex')['Total users'].sum()
                 else:
                     original_gender_data = df2['sex'].value_counts()
             
@@ -1063,7 +1120,11 @@ if not filtered_df.empty:
         if st.session_state.user_login:
             kanal_data = filtered_df['kanal_group'].value_counts()
         else:
-            kanal_data = filtered_df.groupby('kanal_group')['Total users'].sum() if 'Total users' in filtered_df.columns else filtered_df['kanal_group'].value_counts()
+            # For User Non Login, use Total users for weighting
+            if 'Total users' in filtered_df.columns:
+                kanal_data = filtered_df.groupby('kanal_group')['Total users'].sum()
+            else:
+                kanal_data = filtered_df['kanal_group'].value_counts()
         
         # Calculate percentages
         total = kanal_data.sum()
