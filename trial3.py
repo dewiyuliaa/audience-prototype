@@ -341,7 +341,8 @@ def create_trend_chart_figure(daily_stats):
             name='Audience',
             marker=dict(
                 color='rgba(59, 130, 246, 0.7)',
-                line=dict(color='rgba(59, 130, 246, 1)', width=1)
+                line=dict(color='rgba(59, 130, 246, 1)', width=1),
+                cornerradius=2
             ),
             hovertemplate='Date: %{x}<br>Audience: %{y:,}<extra></extra>',
             yaxis='y'
@@ -378,6 +379,7 @@ def create_trend_chart_figure(daily_stats):
             font=dict(size=12)
         ),
         font=dict(size=12),
+        bargap=0.2,  # Add space between bars
         # Primary y-axis (left) for Audience
         yaxis=dict(
             title=dict(text="Audience", font=dict(color="#3B82F6")),
@@ -1360,6 +1362,74 @@ st.markdown("""
 
 # Main charts section
 if not filtered_df.empty:
+    # AUDIENCE SIZE AND TREND SECTION - MOVED TO TOP
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    
+    # Calculate audience size estimation
+    if st.session_state.user_login:
+        # For User Login: count unique users using correct column name
+        if 'user_id' in filtered_df.columns:
+            unique_users = filtered_df['user_id'].nunique()
+            # Create daily data for prediction
+            daily_users = filtered_df.groupby('date')['user_id'].nunique()
+        elif 'userid' in filtered_df.columns:
+            unique_users = filtered_df['userid'].nunique()
+            daily_users = filtered_df.groupby('date')['userid'].nunique()
+        else:
+            unique_users = len(filtered_df)
+            daily_users = filtered_df.groupby('date').size()
+    else:
+        # For User Non Login: use Total users if available
+        if 'Total users' in filtered_df.columns:
+            unique_users = filtered_df['Total users'].sum()
+            daily_users = filtered_df.groupby('date')['Total users'].sum()
+        else:
+            unique_users = len(filtered_df)
+            daily_users = filtered_df.groupby('date').size()
+    
+    # Calculate days in current period (30 days)
+    current_period_days = 30
+    
+    # Predict audience for the period
+    if len(daily_users) > 0:
+        predicted_audience = predict_users_combined(
+            daily_users, 
+            days_to_predict=current_period_days, 
+            user_login=st.session_state.user_login
+        )
+    else:
+        predicted_audience = unique_users
+    
+    # Format the audience range
+    audience_range = format_audience_range(predicted_audience)
+    
+    # Create two columns for Audience Size and Trend
+    size_col, trend_col = st.columns([1, 2])
+    
+    with size_col:
+        # Audience Size Card
+        st.markdown(f"""
+        <div class="audience-size-card">
+            <div class="audience-size-title">Audience Size</div>
+            <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
+            <div class="audience-size-value">{audience_range}</div>
+            <div class="audience-size-disclaimer">
+                Estimates may vary significantly over time based on your targeting selections and available data.
+                <br><br>
+                Reachable Audience is based on audience who have provided valid contact information (email or phone number). This can be downloaded by clicking the button in the top right corner.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with trend_col:
+        # Trend Chart
+        st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Trend: Last 30 Days</h3>", unsafe_allow_html=True)
+        trend_fig = create_trend_chart(filtered_df, st.session_state.user_login, days_to_show=30)
+        st.plotly_chart(trend_fig, use_container_width=True, key="trend_chart")
+    
+    # Add spacing before other charts
+    st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+    
     # Create charts
     col1, col2 = st.columns(2)
     
@@ -1497,69 +1567,6 @@ if not filtered_df.empty:
             
             st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
             st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
-        
-        # NEW SECTION: Audience Size Estimation and Trend
-        st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
-        
-        # Calculate audience size estimation
-        if st.session_state.user_login:
-            # For User Login: count unique users using correct column name
-            if 'user_id' in filtered_df.columns:
-                unique_users = filtered_df['user_id'].nunique()
-                # Create daily data for prediction
-                daily_users = filtered_df.groupby('date')['user_id'].nunique()
-            elif 'userid' in filtered_df.columns:
-                unique_users = filtered_df['userid'].nunique()
-                daily_users = filtered_df.groupby('date')['userid'].nunique()
-            else:
-                unique_users = len(filtered_df)
-                daily_users = filtered_df.groupby('date').size()
-        else:
-            # For User Non Login: use Total users if available
-            if 'Total users' in filtered_df.columns:
-                unique_users = filtered_df['Total users'].sum()
-                daily_users = filtered_df.groupby('date')['Total users'].sum()
-            else:
-                unique_users = len(filtered_df)
-                daily_users = filtered_df.groupby('date').size()
-        
-        # Calculate days in current period (30 days)
-        current_period_days = 30
-        
-        # Predict audience for the period
-        if len(daily_users) > 0:
-            predicted_audience = predict_users_combined(
-                daily_users, 
-                days_to_predict=current_period_days, 
-                user_login=st.session_state.user_login
-            )
-        else:
-            predicted_audience = unique_users
-        
-        # Format the audience range
-        audience_range = format_audience_range(predicted_audience)
-        
-        # Create two columns for Audience Size and Trend
-        size_col, trend_col = st.columns([1, 2])
-        
-        with size_col:
-            # Audience Size Card
-            st.markdown(f"""
-            <div class="audience-size-card">
-                <div class="audience-size-title">Audience Size</div>
-                <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
-                <div class="audience-size-value">{audience_range}</div>
-                <div class="audience-size-disclaimer">
-                    Estimates may vary significantly over time based on your targeting selections and available data.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with trend_col:
-            # Trend Chart
-            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Trend: Last 30 Days</h3>", unsafe_allow_html=True)
-            trend_fig = create_trend_chart(filtered_df, st.session_state.user_login, days_to_show=30)
-            st.plotly_chart(trend_fig, use_container_width=True, key="trend_chart")
 
 else:
     st.info("No data available for the selected filters and date range.")
