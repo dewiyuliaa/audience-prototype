@@ -504,71 +504,13 @@ def load_data():
         st.error(f"Error loading data: {e}")
         return None, None
 
-# Load data
-df1, df2 = load_data()
-if df1 is None or df2 is None:
-    st.stop()
-
-# Get unique values for selectors from the appropriate dataframe
-def get_filter_options(user_login):
-    current_df = df1 if user_login else df2
-    
-    # Get top 10 cities by count/usage
-    if 'city' in current_df.columns:
-        if user_login:
-            top_cities = current_df['city'].value_counts().head(10).index.tolist()
-        else:
-            if 'Total users' in current_df.columns:
-                top_cities = current_df.groupby('city')['Total users'].sum().nlargest(10).index.tolist()
-            else:
-                top_cities = current_df['city'].value_counts().head(10).index.tolist()
-        all_cities = sorted(top_cities)
-    else:
-        all_cities = []
-    
-    all_age_groups = sorted(current_df['age_group'].dropna().unique().tolist()) if 'age_group' in current_df.columns else []
-    all_genders = sorted(current_df['sex'].dropna().unique().tolist()) if 'sex' in current_df.columns else []
-    all_kanals = sorted(current_df['kanal_group'].dropna().unique().tolist()) if 'kanal_group' in current_df.columns else []
-    all_devices = sorted(current_df['device_category'].dropna().unique().tolist()) if 'device_category' in current_df.columns else []
-    
-    all_aws = []
-    all_ages_raw = []
-    all_paylater_status = []
-    
-    if user_login:
-        if 'aws' in current_df.columns:
-            all_aws = sorted(current_df['aws'].dropna().unique().tolist())
-        
-        if 'age' in current_df.columns:
-            all_ages_raw = sorted([str(x) for x in current_df['age'].dropna().unique().tolist()])
-        
-        if 'paylater_status' in current_df.columns:
-            all_paylater_status = sorted(current_df['paylater_status'].dropna().unique().tolist())
-    
-    all_categories = []
-    if 'categoryauto_new_rank1' in current_df.columns:
-        categories_data = current_df['categoryauto_new_rank1'].dropna().unique()
-        if len(categories_data) > 0:
-            all_categories = sorted(categories_data.tolist())
-    
-    min_date_str = current_df['date'].min()
-    max_date_str = current_df['date'].max()
-    min_date = datetime.datetime.strptime(min_date_str, '%Y-%m-%d').date()
+# Function to get last 30 days date range
+def get_last_30_days_range(df):
+    """Get the date range for the last 30 days from the dataset"""
+    max_date_str = df['date'].max()
     max_date = datetime.datetime.strptime(max_date_str, '%Y-%m-%d').date()
-    
-    return {
-        'cities': all_cities,
-        'age_groups': all_age_groups,
-        'genders': all_genders,
-        'kanals': all_kanals,
-        'devices': all_devices,
-        'categories': all_categories,
-        'aws': all_aws,
-        'ages_raw': all_ages_raw,
-        'paylater_status': all_paylater_status,
-        'min_date': min_date,
-        'max_date': max_date
-    }
+    start_date = max_date - timedelta(days=29)  # 30 days including end date
+    return start_date, max_date
 
 # Function to auto-download CSV data
 def auto_download_csv(filtered_df):
@@ -614,26 +556,296 @@ def auto_download_csv(filtered_df):
     else:
         return None, 0
 
+# Chart functions
+def create_age_chart(df, user_login=True):
+    """Create age distribution chart with tosca color"""
+    # Get filtered data
+    if user_login:
+        age_data = df['age_group'].value_counts()
+    else:
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in df.columns:
+            age_data = df.groupby('age_group')['Total users'].sum()
+        else:
+            age_data = df['age_group'].value_counts()
+    
+    # Define age order for consistent display (excluding Unknown and Other)
+    age_order = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
+    
+    # Get all unique age groups from dataset, excluding Unknown and Other
+    all_ages = set(age_data.index.tolist())
+    ordered_ages = [age for age in age_order if age in all_ages and age not in ['Unknown', 'Other']]
+    
+    # Reindex to maintain order
+    age_data = age_data.reindex(ordered_ages, fill_value=0)
+    
+    # Calculate percentages
+    total = age_data.sum()
+    percentages = (age_data / total * 100) if total > 0 else age_data * 0
+    
+    # Create the chart
+    fig = go.Figure()
+    
+    # Add bars with tosca color
+    fig.add_trace(go.Bar(
+        x=ordered_ages,
+        y=percentages,
+        marker=dict(
+            color='rgba(6, 182, 212, 0.8)',
+            cornerradius=4,
+            line=dict(width=0)
+        ),
+        text=[f'{pct:.1f}%' for pct in percentages],
+        textposition='outside',
+        hovertemplate='Age Group: %{x}<br>Percentage: %{y:.1f}%<extra></extra>',
+        showlegend=False
+    ))
+    
+    # Get max value for y-axis range
+    max_value = max(percentages) if len(percentages) > 0 else 0
+    
+    fig.update_layout(
+        xaxis_title="",
+        yaxis_title="Percentage",
+        showlegend=False,
+        height=280,
+        margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        yaxis=dict(
+            range=[0, max_value * 1.15] if max_value > 0 else [0, 100],
+            gridcolor='rgba(0,0,0,0.1)',
+            griddash='dot'
+        ),
+        xaxis=dict(
+            gridcolor='rgba(0,0,0,0.1)',
+            griddash='dot'
+        )
+    )
+    
+    return fig
+
+def create_city_chart(df, user_login=True):
+    """Create city distribution chart with tosca color"""
+    # Get filtered data (top 5 cities)
+    if user_login:
+        city_data = df['city'].value_counts().head(5)
+    else:
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in df.columns:
+            city_data = df.groupby('city')['Total users'].sum().head(5)
+        else:
+            city_data = df['city'].value_counts().head(5)
+    
+    # Calculate percentages
+    total = city_data.sum()
+    percentages = (city_data / total * 100) if total > 0 else city_data * 0
+    
+    # Create the chart
+    fig = go.Figure()
+    
+    # Add bars with tosca color
+    fig.add_trace(go.Bar(
+        x=city_data.index,
+        y=percentages,
+        marker=dict(
+            color='rgba(6, 182, 212, 0.8)',
+            cornerradius=4,
+            line=dict(width=0)
+        ),
+        text=[f'{pct:.1f}%' for pct in percentages],
+        textposition='outside',
+        hovertemplate='City: %{x}<br>Percentage: %{y:.1f}%<extra></extra>',
+        showlegend=False
+    ))
+    
+    # Get max value for y-axis range
+    max_value = max(percentages) if len(percentages) > 0 else 0
+    
+    fig.update_layout(
+        xaxis_title="",
+        yaxis_title="Percentage",
+        showlegend=False,
+        height=280,
+        margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        xaxis=dict(
+            tickangle=45,
+            gridcolor='rgba(0,0,0,0.1)',
+            griddash='dot'
+        ),
+        yaxis=dict(
+            range=[0, max_value * 1.15] if max_value > 0 else [0, 100],
+            gridcolor='rgba(0,0,0,0.1)',
+            griddash='dot'
+        )
+    )
+    
+    return fig
+
+def create_gender_chart(df, user_login=True):
+    """Create gender distribution pie chart"""
+    if user_login:
+        gender_data = df['sex'].value_counts()
+    else:
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in df.columns:
+            gender_data = df.groupby('sex')['Total users'].sum()
+        else:
+            gender_data = df['sex'].value_counts()
+    
+    # Exclude unknown values
+    gender_data = gender_data.drop(['unknown'], errors='ignore')
+    
+    # Calculate percentages
+    total = gender_data.sum()
+    percentages = (gender_data / total * 100) if total > 0 else gender_data * 0
+    
+    # Create pie chart
+    fig = go.Figure(data=[go.Pie(
+        labels=[label.title() for label in gender_data.index],
+        values=percentages,
+        hole=0.5,
+        marker=dict(
+            colors=['rgba(79, 70, 229, 0.8)', 'rgba(6, 182, 212, 0.8)', 'rgba(16, 185, 129, 0.8)'],
+            line=dict(color='rgba(255,255,255,0.8)', width=2)
+        ),
+        textinfo='none',
+        hovertemplate='%{label}: %{value:.1f}%<extra></extra>',
+        showlegend=False
+    )])
+    
+    fig.update_layout(
+        height=110,
+        margin=dict(l=0, r=100, t=0, b=0),
+        showlegend=False,
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    )
+    
+    return fig, percentages
+
+def create_device_chart(df, user_login=True):
+    """Create device category distribution pie chart"""
+    if user_login:
+        device_data = df['device_category'].value_counts()
+    else:
+        # For User Non Login, use Total users for weighting
+        if 'Total users' in df.columns:
+            device_data = df.groupby('device_category')['Total users'].sum()
+        else:
+            device_data = df['device_category'].value_counts()
+    
+    # Calculate percentages
+    total = device_data.sum()
+    percentages = (device_data / total * 100) if total > 0 else device_data * 0
+    
+    # Create custom labels with percentages
+    labels_with_pct = []
+    for label, pct in zip(device_data.index, percentages):
+        labels_with_pct.append(f"{label}<br>{pct:.1f}%")
+    
+    # Create pie chart
+    fig = go.Figure(data=[go.Pie(
+        labels=labels_with_pct,
+        values=percentages,
+        hole=0.5,
+        marker=dict(
+            colors=['rgba(16, 185, 129, 0.8)', 'rgba(16, 185, 129, 0.6)', 'rgba(16, 185, 129, 0.4)'],
+            line=dict(color='rgba(255,255,255,0.8)', width=2)
+        ),
+        textinfo='none',
+        hovertemplate='%{label}<extra></extra>',
+        showlegend=True
+    )])
+    
+    fig.update_layout(
+        height=220,
+        margin=dict(l=0, r=100, t=30, b=0),
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=0.85,
+            font=dict(size=11)
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    )
+    
+    return fig
+
+# Load data
+df1, df2 = load_data()
+if df1 is None or df2 is None:
+    st.stop()
+
+# Get last 30 days date range based on current dataset
+current_df = df1 if st.session_state.user_login else df2
+start_date, end_date = get_last_30_days_range(current_df)
+
+# Get unique values for selectors from the appropriate dataframe
+def get_filter_options(user_login):
+    current_df = df1 if user_login else df2
+    
+    # Get top 10 cities by count/usage
+    if 'city' in current_df.columns:
+        if user_login:
+            top_cities = current_df['city'].value_counts().head(10).index.tolist()
+        else:
+            if 'Total users' in current_df.columns:
+                top_cities = current_df.groupby('city')['Total users'].sum().nlargest(10).index.tolist()
+            else:
+                top_cities = current_df['city'].value_counts().head(10).index.tolist()
+        all_cities = sorted(top_cities)
+    else:
+        all_cities = []
+    
+    all_age_groups = sorted(current_df['age_group'].dropna().unique().tolist()) if 'age_group' in current_df.columns else []
+    all_genders = sorted(current_df['sex'].dropna().unique().tolist()) if 'sex' in current_df.columns else []
+    all_kanals = sorted(current_df['kanal_group'].dropna().unique().tolist()) if 'kanal_group' in current_df.columns else []
+    all_devices = sorted(current_df['device_category'].dropna().unique().tolist()) if 'device_category' in current_df.columns else []
+    
+    all_aws = []
+    all_ages_raw = []
+    all_paylater_status = []
+    
+    if user_login:
+        if 'aws' in current_df.columns:
+            all_aws = sorted(current_df['aws'].dropna().unique().tolist())
+        
+        if 'age' in current_df.columns:
+            all_ages_raw = sorted([str(x) for x in current_df['age'].dropna().unique().tolist()])
+        
+        if 'paylater_status' in current_df.columns:
+            all_paylater_status = sorted(current_df['paylater_status'].dropna().unique().tolist())
+    
+    all_categories = []
+    if 'categoryauto_new_rank1' in current_df.columns:
+        categories_data = current_df['categoryauto_new_rank1'].dropna().unique()
+        if len(categories_data) > 0:
+            all_categories = sorted(categories_data.tolist())
+    
+    return {
+        'cities': all_cities,
+        'age_groups': all_age_groups,
+        'genders': all_genders,
+        'kanals': all_kanals,
+        'devices': all_devices,
+        'categories': all_categories,
+        'aws': all_aws,
+        'ages_raw': all_ages_raw,
+        'paylater_status': all_paylater_status
+    }
+
 # Get initial filter options
 filter_options = get_filter_options(st.session_state.user_login)
 
-# Sidebar configuration FIRST
+# Sidebar configuration
 st.sidebar.title("Filter audience")
-
-# Date range selector
-st.sidebar.markdown("### 🗓 Select date range")
-date_range = st.sidebar.date_input(
-    "",
-    [filter_options['min_date'], filter_options['max_date']],
-    min_value=filter_options['min_date'],
-    max_value=filter_options['max_date'],
-    format="YYYY/MM/DD",
-    label_visibility="collapsed",
-    key="date_range_selector"
-)
-
-start_date = date_range[0] if len(date_range) > 0 else filter_options['min_date']
-end_date = date_range[1] if len(date_range) > 1 else filter_options['max_date']
 
 # City selector
 st.sidebar.markdown("### 📍 Locations")
@@ -731,7 +943,7 @@ selected_categories = st.sidebar.multiselect(
 st.sidebar.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
 if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
     filter_keys = [
-        "date_range_selector", "city_selector", "age_selector", 
+        "city_selector", "age_selector", 
         "gender_multiselect", "kanal_selector", 
         "device_selector", "category_selector", "aws_selector", "paylater_selector"
     ]
@@ -740,7 +952,6 @@ if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
         if key in st.session_state:
             del st.session_state[key]
     
-    st.session_state["date_range_selector"] = [filter_options['min_date'], filter_options['max_date']]
     st.session_state["city_selector"] = []
     st.session_state["age_selector"] = []
     st.session_state["gender_multiselect"] = []
@@ -752,7 +963,7 @@ if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
         
     st.rerun()
 
-# NOW ADD THE HEADER AND CSS - BACKGROUND CHANGED TO WHITE
+# CSS and Header styling
 st.markdown("""
 <style>
     /* Hide Streamlit default elements */
@@ -942,7 +1153,7 @@ with nav_container:
                 st.session_state.user_login = False
                 st.rerun()
 
-# Add CSS to style the buttons and position them like the original header - REMOVED RED LINES
+# Add CSS to style the buttons and position them like the original header
 st.markdown(f"""
 <style>
 /* Position the navigation buttons to overlay on the black header */
@@ -1002,309 +1213,11 @@ div[data-testid="column"]:nth-child(3) .stButton > button {{
 </style>
 """, unsafe_allow_html=True)
 
-# Chart functions
-def create_age_comparison_chart(filtered_df, original_df, user_login=True):
-    """Create age distribution comparison chart between All audience and Selected audience"""
-    # Get filtered data
-    if user_login:
-        selected_age_data = filtered_df['age_group'].value_counts()
-        original_age_data = original_df['age_group'].value_counts()
-    else:
-        # For User Non Login, use Age column and Total users for weighting
-        if 'Total users' in filtered_df.columns:
-            selected_age_data = filtered_df.groupby('age_group')['Total users'].sum()
-            original_age_data = original_df.groupby('age_group')['Total users'].sum()
-        else:
-            selected_age_data = filtered_df['age_group'].value_counts()
-            original_age_data = original_df['age_group'].value_counts()
-    
-    # Define age order for consistent display (excluding Unknown and Other)
-    age_order = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
-    
-    # Get all unique age groups from both datasets, excluding Unknown and Other
-    all_ages = set(selected_age_data.index.tolist() + original_age_data.index.tolist())
-    ordered_ages = [age for age in age_order if age in all_ages and age not in ['Unknown', 'Other']]
-    
-    # Reindex to maintain order
-    selected_age_data = selected_age_data.reindex(ordered_ages, fill_value=0)
-    original_age_data = original_age_data.reindex(ordered_ages, fill_value=0)
-    
-    # Calculate percentages
-    selected_total = selected_age_data.sum()
-    original_total = original_age_data.sum()
-    selected_percentages = (selected_age_data / selected_total * 100) if selected_total > 0 else selected_age_data * 0
-    original_percentages = (original_age_data / original_total * 100) if original_total > 0 else original_age_data * 0
-    
-    # Create the chart
-    fig = go.Figure()
-    
-    # Add bars for All audience (blue)
-    fig.add_trace(go.Bar(
-        x=ordered_ages,
-        y=original_percentages,
-        name='All',
-        marker=dict(
-            color='rgba(59, 130, 246, 0.8)',
-            cornerradius=4,
-            line=dict(width=0)
-        ),
-        text=[f'{pct:.1f}%' for pct in original_percentages],
-        textposition='outside',
-        hovertemplate='Age Group: %{x}<br>All audience: %{y:.1f}%<extra></extra>'
-    ))
-    
-    # Add bars for Selected audience (tosca/cyan)
-    fig.add_trace(go.Bar(
-        x=ordered_ages,
-        y=selected_percentages,
-        name='Selected',
-        marker=dict(
-            color='rgba(6, 182, 212, 0.8)',
-            cornerradius=4,
-            line=dict(width=0)
-        ),
-        text=[f'{pct:.1f}%' for pct in selected_percentages],
-        textposition='outside',
-        hovertemplate='Age Group: %{x}<br>Selected audience: %{y:.1f}%<extra></extra>'
-    ))
-    
-    # Get max value for y-axis range
-    max_value = max(max(original_percentages) if len(original_percentages) > 0 else 0, 
-                   max(selected_percentages) if len(selected_percentages) > 0 else 0)
-    
-    fig.update_layout(
-        xaxis_title="",
-        yaxis_title="Percentage",
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        height=280,
-        margin=dict(l=0, r=0, t=30, b=0),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        barmode='group',
-        bargap=0.25,
-        bargroupgap=0.2,
-        yaxis=dict(
-            range=[0, max_value * 1.15] if max_value > 0 else [0, 100],
-            gridcolor='rgba(0,0,0,0.1)',
-            griddash='dot'
-        ),
-        xaxis=dict(
-            gridcolor='rgba(0,0,0,0.1)',
-            griddash='dot'
-        )
-    )
-    
-    return fig
-
-def create_city_comparison_chart(filtered_df, original_df, user_login=True):
-    """Create city distribution comparison chart between All audience and Selected audience"""
-    # Get filtered data (top 10 cities)
-    if user_login:
-        selected_city_data = filtered_df['city'].value_counts().head(10)
-        original_city_data = original_df['city'].value_counts().head(10)
-    else:
-        # For User Non Login, use Total users for weighting
-        if 'Total users' in filtered_df.columns:
-            selected_city_data = filtered_df.groupby('city')['Total users'].sum().head(10)
-            original_city_data = original_df.groupby('city')['Total users'].sum().head(10)
-        else:
-            selected_city_data = filtered_df['city'].value_counts().head(10)
-            original_city_data = original_df['city'].value_counts().head(10)
-    
-    # Get all unique cities from both datasets (combine and take top 10)
-    all_cities_combined = pd.concat([selected_city_data, original_city_data]).groupby(level=0).sum()
-    top_cities = all_cities_combined.nlargest(10).index.tolist()
-    
-    # Reindex both datasets to include all top cities
-    selected_city_data = selected_city_data.reindex(top_cities, fill_value=0)
-    original_city_data = original_city_data.reindex(top_cities, fill_value=0)
-    
-    # Calculate percentages
-    selected_total = selected_city_data.sum()
-    original_total = original_city_data.sum()
-    selected_percentages = (selected_city_data / selected_total * 100) if selected_total > 0 else selected_city_data * 0
-    original_percentages = (original_city_data / original_total * 100) if original_total > 0 else original_city_data * 0
-    
-    # Create the chart
-    fig = go.Figure()
-    
-    # Add bars for All audience (blue)
-    fig.add_trace(go.Bar(
-        x=top_cities,
-        y=original_percentages,
-        name='All',
-        marker=dict(
-            color='rgba(59, 130, 246, 0.8)',
-            cornerradius=4,
-            line=dict(width=0)
-        ),
-        text=[f'{pct:.1f}%' for pct in original_percentages],
-        textposition='outside',
-        hovertemplate='City: %{x}<br>All audience: %{y:.1f}%<extra></extra>'
-    ))
-    
-    # Add bars for Selected audience (tosca/cyan)
-    fig.add_trace(go.Bar(
-        x=top_cities,
-        y=selected_percentages,
-        name='Selected',
-        marker=dict(
-            color='rgba(6, 182, 212, 0.8)',
-            cornerradius=4,
-            line=dict(width=0)
-        ),
-        text=[f'{pct:.1f}%' for pct in selected_percentages],
-        textposition='outside',
-        hovertemplate='City: %{x}<br>Selected audience: %{y:.1f}%<extra></extra>'
-    ))
-    
-    # Get max value for y-axis range
-    max_value = max(max(original_percentages) if len(original_percentages) > 0 else 0, 
-                   max(selected_percentages) if len(selected_percentages) > 0 else 0)
-    
-    fig.update_layout(
-        xaxis_title="",
-        yaxis_title="Percentage",
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        height=280,
-        margin=dict(l=0, r=0, t=30, b=0),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        barmode='group',
-        bargap=0.25,
-        bargroupgap=0.2,
-        xaxis=dict(
-            tickangle=45,
-            gridcolor='rgba(0,0,0,0.1)',
-            griddash='dot'
-        ),
-        yaxis=dict(
-            range=[0, max_value * 1.15] if max_value > 0 else [0, 100],
-            gridcolor='rgba(0,0,0,0.1)',
-            griddash='dot'
-        )
-    )
-    
-    return fig
-
-def create_gender_chart(df, user_login=True):
-    """Create gender distribution pie chart"""
-    if user_login:
-        gender_data = df['sex'].value_counts()
-    else:
-        # For User Non Login, use Total users for weighting
-        if 'Total users' in df.columns:
-            gender_data = df.groupby('sex')['Total users'].sum()
-        else:
-            gender_data = df['sex'].value_counts()
-    
-    # Calculate percentages
-    total = gender_data.sum()
-    percentages = (gender_data / total * 100) if total > 0 else gender_data * 0
-    
-    # Create pie chart
-    fig = go.Figure(data=[go.Pie(
-        labels=[label.title() for label in gender_data.index],
-        values=percentages,
-        hole=0.5,
-        marker=dict(
-            colors=['rgba(79, 70, 229, 0.8)', 'rgba(6, 182, 212, 0.8)', 'rgba(16, 185, 129, 0.8)'],
-            line=dict(color='rgba(255,255,255,0.8)', width=2)
-        ),
-        textinfo='none',
-        hovertemplate='%{label}: %{value:.1f}%<extra></extra>',
-        showlegend=False
-    )])
-    
-    fig.update_layout(
-        height=110,
-        margin=dict(l=0, r=100, t=0, b=0),
-        showlegend=False,
-        plot_bgcolor='white',
-        paper_bgcolor='white'
-    )
-    
-    return fig, percentages
-
-def create_device_chart(df, user_login=True):
-    """Create device category distribution chart"""
-    if user_login:
-        device_data = df['device_category'].value_counts()
-    else:
-        # For User Non Login, use Total users for weighting
-        if 'Total users' in df.columns:
-            device_data = df.groupby('device_category')['Total users'].sum()
-        else:
-            device_data = df['device_category'].value_counts()
-    
-    # Calculate percentages
-    total = device_data.sum()
-    percentages = (device_data / total * 100) if total > 0 else device_data * 0
-    
-    # Create the chart
-    fig = go.Figure()
-    
-    # Add bars with gradient effect
-    for i, (device, pct) in enumerate(zip(device_data.index, percentages)):
-        fig.add_trace(go.Bar(
-            x=[device],
-            y=[pct],
-            marker=dict(
-                color=f'rgba(16, 185, 129, {1 - i*0.15})',
-                cornerradius=4,
-                line=dict(width=0),
-                pattern=dict(
-                    shape='',
-                    bgcolor=f'rgba(16, 185, 129, 0.2)',
-                    fgcolor=f'rgba(16, 185, 129, {1 - i*0.1})'
-                )
-            ),
-            text=f'{pct:.1f}%',
-            textposition='outside',
-            hovertemplate=f'Device: {device}<br>Percentage: {pct:.1f}%<extra></extra>',
-            showlegend=False
-        ))
-    
-    fig.update_layout(
-        xaxis_title="",
-        yaxis_title="Percentage",
-        showlegend=False,
-        height=280,
-        margin=dict(l=0, r=0, t=0, b=0),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        yaxis=dict(
-            range=[0, max(percentages) * 1.15] if len(percentages) > 0 else [0, 100],
-            gridcolor='rgba(0,0,0,0.1)',
-            griddash='dot'
-        ),
-        xaxis=dict(
-            gridcolor='rgba(0,0,0,0.1)',
-            griddash='dot'
-        )
-    )
-    
-    return fig
-
 # Apply filters to the dataframe
 current_df = df1 if st.session_state.user_login else df2
 filtered_df = current_df.copy()
 
-# Apply date filter
+# Apply date filter (last 30 days)
 start_date_str = start_date.strftime('%Y-%m-%d')
 end_date_str = end_date.strftime('%Y-%m-%d')
 filtered_df = filtered_df[(filtered_df['date'] >= start_date_str) & 
@@ -1382,7 +1295,6 @@ with data_col:
         # For User Non Login, show empty space or alternative content
         st.markdown("")
 
-# Remove the download handling section since we're using direct download
 # Initialize download trigger state
 if 'download_triggered' not in st.session_state:
     st.session_state.download_triggered = False
@@ -1392,72 +1304,23 @@ st.markdown("""
 <div style='border-bottom: 1px solid #e2e8f0; margin-top: -7px; margin-bottom: 20px;'></div>
 """, unsafe_allow_html=True)
 
-# Main charts section - REMOVED ALL CHART CONTAINER DIVS
+# Main charts section
 if not filtered_df.empty:
     # Create charts
     col1, col2 = st.columns(2)
     
     with col1:
-        # Age chart with comparison - NO CONTAINER
+        # Age chart - now simplified to show only selected audience
         st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Age</h3>", unsafe_allow_html=True)
-        original_df = df1 if st.session_state.user_login else df2
-        age_fig = create_age_comparison_chart(filtered_df, original_df, st.session_state.user_login)
+        age_fig = create_age_chart(filtered_df, st.session_state.user_login)
         st.plotly_chart(age_fig, use_container_width=True, key="age_chart")
     
     with col2:
-        # Gender chart with statistics stacked vertically - NO CONTAINER
+        # Gender chart with statistics stacked vertically
         st.markdown("<h3 style='margin: 0 0 -30px 0; color: #374151; font-size: 16px;'>Gender</h3>", unsafe_allow_html=True)
         
         if not filtered_df.empty:
             gender_fig, gender_percentages = create_gender_chart(filtered_df, st.session_state.user_login)
-            
-            # Calculate "All audience" from original unfiltered data
-            if st.session_state.user_login:
-                original_gender_data = df1['sex'].value_counts()
-            else:
-                if 'Total users' in df2.columns:
-                    original_gender_data = df2.groupby('sex')['Total users'].sum()
-                else:
-                    original_gender_data = df2['sex'].value_counts()
-            
-            # Calculate percentages for all audience
-            original_total = original_gender_data.sum()
-            original_percentages = (original_gender_data / original_total * 100) if original_total > 0 else original_gender_data * 0
-            
-            # Create custom labels with percentages for All audience
-            all_labels_with_pct = []
-            for label, pct in zip(original_gender_data.index, original_percentages):
-                all_labels_with_pct.append(f"{label.title()}<br>{pct:.1f}%")
-            
-            # Create pie chart for "All audience"
-            all_audience_fig = go.Figure(data=[go.Pie(
-                labels=all_labels_with_pct,
-                values=original_percentages,
-                hole=0.5,
-                marker=dict(
-                    colors=['rgba(79, 70, 229, 0.8)', 'rgba(6, 182, 212, 0.8)', 'rgba(16, 185, 129, 0.8)'],
-                    line=dict(color='rgba(255,255,255,0.8)', width=2)
-                ),
-                textinfo='none',
-                hovertemplate='%{label}<extra></extra>',
-                showlegend=True
-            )])
-            
-            all_audience_fig.update_layout(
-                height=110,
-                margin=dict(l=0, r=100, t=0, b=0),
-                showlegend=True,
-                legend=dict(
-                    orientation="v",
-                    yanchor="middle",
-                    y=0.5,
-                    xanchor="left",
-                    x=0.85,
-                    font=dict(size=11)
-                ),
-                plot_bgcolor='white',
-                paper_bgcolor='white'
-            )
             
             # Create custom labels with percentages for Selected audience
             selected_labels_with_pct = []
@@ -1479,8 +1342,8 @@ if not filtered_df.empty:
             )])
             
             selected_gender_fig.update_layout(
-                height=110,
-                margin=dict(l=0, r=100, t=0, b=0),
+                height=220,
+                margin=dict(l=0, r=100, t=30, b=0),
                 showlegend=True,
                 legend=dict(
                     orientation="v",
@@ -1494,31 +1357,26 @@ if not filtered_df.empty:
                 paper_bgcolor='white'
             )
             
-            # ALL AUDIENCE - Title and Chart
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-            st.markdown("<p style='font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 500;'>All audience</p>", unsafe_allow_html=True)
-            st.plotly_chart(all_audience_fig, use_container_width=True, key="all_audience_gender")
-            
-            # SELECTED AUDIENCE - Title and Chart  
-            st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-            st.markdown("<p style='font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 500;'>Selected audience</p>", unsafe_allow_html=True)
             st.plotly_chart(selected_gender_fig, use_container_width=True, key="selected_audience_gender")
     
-    # Top Cities chart with comparison (full width) - NO CONTAINER
-    st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Top Cities</h3>", unsafe_allow_html=True)
-    original_df = df1 if st.session_state.user_login else df2
-    city_fig = create_city_comparison_chart(filtered_df, original_df, st.session_state.user_login)
-    st.plotly_chart(city_fig, use_container_width=True, key="top_cities_chart")
+    # Top Cities and Device Category charts in two columns
+    city_col, device_col = st.columns(2)
     
-    # Device Category chart (full width) - NO CONTAINER
-    st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Device Category</h3>", unsafe_allow_html=True)
-    device_fig = create_device_chart(filtered_df, st.session_state.user_login)
-    st.plotly_chart(device_fig, use_container_width=True, key="device_category_chart")
+    with city_col:
+        # Top Cities chart - simplified to show only selected audience
+        st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Top Cities</h3>", unsafe_allow_html=True)
+        city_fig = create_city_chart(filtered_df, st.session_state.user_login)
+        st.plotly_chart(city_fig, use_container_width=True, key="top_cities_chart")
     
-    # Additional charts if there's kanal data - NO CONTAINER
+    with device_col:
+        # Device Category chart as pie chart
+        st.markdown("<h3 style='margin: 0 0 -30px 0; color: #374151; font-size: 16px;'>Device Category</h3>", unsafe_allow_html=True)
+        device_fig = create_device_chart(filtered_df, st.session_state.user_login)
+        st.plotly_chart(device_fig, use_container_width=True, key="device_category_chart")
+    
+    # Additional charts if there's kanal data
     if 'kanal_group' in filtered_df.columns and not filtered_df['kanal_group'].isna().all():
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-        st.markdown("### Kanal Distribution")
         
         # Create kanal chart
         if st.session_state.user_login:
@@ -1606,8 +1464,8 @@ if not filtered_df.empty:
                 unique_users = len(filtered_df)
                 daily_users = filtered_df.groupby('date').size()
         
-        # Calculate days in current period
-        current_period_days = (end_date - start_date).days + 1
+        # Calculate days in current period (30 days)
+        current_period_days = 30
         
         # Predict audience for the period
         if len(daily_users) > 0:
@@ -1630,7 +1488,7 @@ if not filtered_df.empty:
             st.markdown(f"""
             <div class="audience-size-card">
                 <div class="audience-size-title">Audience Size</div>
-                <div class="audience-size-subtitle">Estimated Audience Size ({current_period_days} days)</div>
+                <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
                 <div class="audience-size-value">{audience_range}</div>
                 <div class="audience-size-disclaimer">
                     Estimates may vary significantly over time based on your targeting selections and available data.
