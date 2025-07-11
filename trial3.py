@@ -105,135 +105,6 @@ def format_number_display(value):
     else:
         return f"{value:,}"
 
-def calculate_key_metrics(current_df, previous_df, user_login=True, current_period_days=1):
-    """Calculate key metrics for the dashboard with growth comparison"""
-    
-    def calculate_metrics_for_period(df, user_login):
-        """Helper function to calculate metrics for a specific period"""
-        if df.empty:
-            return {
-                'unique_users': 0,
-                'total_views': 0,
-                'views_per_user': 0,
-                'average_session_duration': 0,
-                'sessions_per_user': 0
-            }
-        
-        if user_login:
-            # For User Login data
-            if 'user_id' in df.columns:
-                unique_users = df['user_id'].nunique()
-                user_col = 'user_id'
-            elif 'userid' in df.columns:
-                unique_users = df['userid'].nunique()
-                user_col = 'userid'
-            else:
-                unique_users = len(df)
-                user_col = None
-            
-            # Calculate total page views
-            if 'page_views' in df.columns:
-                total_views = df['page_views'].sum()
-            elif 'pageviews' in df.columns:
-                total_views = df['pageviews'].sum()
-            else:
-                total_views = len(df)  # Fallback: count rows as views
-            
-            # Calculate views per user
-            views_per_user = round(total_views / unique_users, 2) if unique_users > 0 else 0
-            
-            # Calculate session metrics
-            if 'session_length_in_seconds' in df.columns and 'session_id' in df.columns:
-                total_session_time = df['session_length_in_seconds'].sum()
-                unique_sessions_count = df['session_id'].nunique()
-                average_session_duration = round(total_session_time / unique_sessions_count, 2) if unique_sessions_count > 0 else 0
-                
-                # Calculate sessions per user
-                if user_col:
-                    df_temp = df.copy()
-                    df_temp['user_session'] = df_temp[user_col].astype(str) + '_' + df_temp['session_id'].astype(str)
-                    unique_user_sessions = df_temp['user_session'].nunique()
-                    sessions_per_user = round(unique_user_sessions / unique_users, 2) if unique_users > 0 else 0
-                else:
-                    sessions_per_user = round(unique_sessions_count / unique_users, 2) if unique_users > 0 else 0
-            else:
-                # Fallback calculations
-                average_session_duration = 0
-                sessions_per_user = 1.0  # Assume 1 session per user as fallback
-        
-        else:
-            # For User Non Login data
-            if 'Total users' in df.columns:
-                unique_users = df['Total users'].sum()
-            else:
-                unique_users = len(df)
-            
-            # Calculate total views
-            if 'Views' in df.columns:
-                total_views = df['Views'].sum()
-            else:
-                total_views = len(df)  # Fallback
-            
-            # Calculate views per user
-            views_per_user = round(total_views / unique_users, 2) if unique_users > 0 else 0
-            
-            # For User Non Login, we might not have session data, so use estimates
-            average_session_duration = 0  # Not available in non-login data typically
-            sessions_per_user = 1.0  # Estimate 1 session per user
-        
-        return {
-            'unique_users': unique_users,
-            'total_views': total_views,
-            'views_per_user': views_per_user,
-            'average_session_duration': average_session_duration,
-            'sessions_per_user': sessions_per_user
-        }
-    
-    def calculate_growth_percentage(current_value, previous_value):
-        """Calculate growth percentage"""
-        if previous_value == 0:
-            return 100.0 if current_value > 0 else 0.0
-        return round(((current_value - previous_value) / previous_value) * 100, 1)
-    
-    # Calculate metrics for current and previous periods
-    current_metrics = calculate_metrics_for_period(current_df, user_login)
-    previous_metrics = calculate_metrics_for_period(previous_df, user_login)
-    
-    # Calculate growth percentages
-    growth_metrics = {
-        'unique_users_growth': calculate_growth_percentage(
-            current_metrics['unique_users'], 
-            previous_metrics['unique_users']
-        ),
-        'total_views_growth': calculate_growth_percentage(
-            current_metrics['total_views'], 
-            previous_metrics['total_views']
-        ),
-        'views_per_user_growth': calculate_growth_percentage(
-            current_metrics['views_per_user'], 
-            previous_metrics['views_per_user']
-        ),
-        'average_session_duration_growth': calculate_growth_percentage(
-            current_metrics['average_session_duration'], 
-            previous_metrics['average_session_duration']
-        ),
-        'sessions_per_user_growth': calculate_growth_percentage(
-            current_metrics['sessions_per_user'], 
-            previous_metrics['sessions_per_user']
-        )
-    }
-    
-    # Combine current metrics with growth percentages
-    return {
-        'unique_users': current_metrics['unique_users'],
-        'total_views': current_metrics['total_views'],
-        'views_per_user': current_metrics['views_per_user'],
-        'average_session_duration': current_metrics['average_session_duration'],
-        'sessions_per_user': current_metrics['sessions_per_user'],
-        'period_days': current_period_days,
-        'growth': growth_metrics
-    }
-
 def predict_users_combined(daily_data, days_to_predict=1, use_last_n_days=30, user_login=True):
     """Predict users for multiple days based on historical data"""
     if len(daily_data) == 0:
@@ -1714,8 +1585,6 @@ if not filtered_df.empty:
         st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
         
         # Calculate audience size estimation
-        current_period_days = (end_date - start_date).days + 1
-        
         if st.session_state.user_login:
             # For User Login: count unique users using correct column name
             if 'user_id' in filtered_df.columns:
@@ -1736,6 +1605,9 @@ if not filtered_df.empty:
             else:
                 unique_users = len(filtered_df)
                 daily_users = filtered_df.groupby('date').size()
+        
+        # Calculate days in current period
+        current_period_days = (end_date - start_date).days + 1
         
         # Predict audience for the period
         if len(daily_users) > 0:
@@ -1771,135 +1643,6 @@ if not filtered_df.empty:
             st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Trend: Last 30 Days</h3>", unsafe_allow_html=True)
             trend_fig = create_trend_chart(filtered_df, st.session_state.user_login, days_to_show=30)
             st.plotly_chart(trend_fig, use_container_width=True, key="trend_chart")
-
-        # NEW SECTION: Key Metrics
-        st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
-        
-        # Calculate previous period for comparison
-        previous_start_date = start_date - timedelta(days=current_period_days)
-        previous_end_date = start_date - timedelta(days=1)
-        
-        # Filter previous period data with same filters except date
-        previous_df = current_df.copy()
-        previous_start_str = previous_start_date.strftime('%Y-%m-%d')
-        previous_end_str = previous_end_date.strftime('%Y-%m-%d')
-        previous_df = previous_df[(previous_df['date'] >= previous_start_str) & 
-                                  (previous_df['date'] <= previous_end_str)]
-        
-        # Apply the same filters to previous period data
-        if selected_cities:
-            previous_df = previous_df[previous_df['city'].isin(selected_cities)]
-        if selected_age:
-            previous_df = previous_df[previous_df['age_group'].isin(selected_age)]
-        if selected_genders:
-            previous_df = previous_df[previous_df['sex'].isin(selected_genders)]
-        if selected_kanal:
-            previous_df = previous_df[previous_df['kanal_group'].isin(selected_kanal)]
-        if selected_device:
-            previous_df = previous_df[previous_df['device_category'].isin(selected_device)]
-        if selected_categories and 'categoryauto_new_rank1' in current_df.columns:
-            previous_df = previous_df[previous_df['categoryauto_new_rank1'].isin(selected_categories)]
-        if st.session_state.user_login:
-            if selected_aws and 'aws' in current_df.columns:
-                previous_df = previous_df[previous_df['aws'].isin(selected_aws)]
-            if selected_paylater and 'paylater_status' in current_df.columns:
-                previous_df = previous_df[previous_df['paylater_status'].isin(selected_paylater)]
-        
-        # Calculate key metrics with growth comparison
-        metrics = calculate_key_metrics(filtered_df, previous_df, st.session_state.user_login, current_period_days)
-        
-        # Helper function to format growth percentage
-        def format_growth_display(growth_value):
-            if growth_value > 0:
-                return f"<span style='margin-right: 4px;'>▲</span>{growth_value:.1f}%"
-            elif growth_value < 0:
-                return f"<span style='margin-right: 4px;'>▼</span>{abs(growth_value):.1f}%"
-            else:
-                return f"<span style='margin-right: 4px;'>—</span>0.0%"
-        
-        def get_growth_color(growth_value):
-            if growth_value > 0:
-                return "#10b981"  # Green
-            elif growth_value < 0:
-                return "#ef4444"  # Red
-            else:
-                return "#6b7280"  # Gray
-        
-        # Create Key Metrics section
-        st.markdown(f"<h2 style='margin: 0 0 20px 0; color: #374151; font-size: 20px; font-weight: 600;'>Key Metrics ({current_period_days} days)</h2>", unsafe_allow_html=True)
-        
-        # Create 5 columns for metrics
-        metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
-        
-        with metric_col1:
-            growth_color = get_growth_color(metrics['growth']['unique_users_growth'])
-            growth_text = format_growth_display(metrics['growth']['unique_users_growth'])
-            st.markdown(f"""
-            <div style='background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border: 1px solid #e5e7eb;'>
-                <div style='font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 8px;'>{format_number_display(metrics['unique_users'])}</div>
-                <div style='font-size: 0.875rem; color: #6b7280; font-weight: 500; margin-bottom: 8px;'>AUDIENCES</div>
-                <div style='color: {growth_color}; font-size: 0.875rem; font-weight: 500;'>
-                    {growth_text}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col2:
-            growth_color = get_growth_color(metrics['growth']['total_views_growth'])
-            growth_text = format_growth_display(metrics['growth']['total_views_growth'])
-            st.markdown(f"""
-            <div style='background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border: 1px solid #e5e7eb;'>
-                <div style='font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 8px;'>{format_number_display(metrics['total_views'])}</div>
-                <div style='font-size: 0.875rem; color: #6b7280; font-weight: 500; margin-bottom: 8px;'>VIEWS</div>
-                <div style='color: {growth_color}; font-size: 0.875rem; font-weight: 500;'>
-                    {growth_text}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col3:
-            growth_color = get_growth_color(metrics['growth']['views_per_user_growth'])
-            growth_text = format_growth_display(metrics['growth']['views_per_user_growth'])
-            st.markdown(f"""
-            <div style='background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border: 1px solid #e5e7eb;'>
-                <div style='font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 8px;'>{metrics['views_per_user']}</div>
-                <div style='font-size: 0.875rem; color: #6b7280; font-weight: 500; margin-bottom: 8px;'>VIEWS/USER</div>
-                <div style='color: {growth_color}; font-size: 0.875rem; font-weight: 500;'>
-                    {growth_text}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col4:
-            if metrics['average_session_duration'] > 0:
-                duration_display = f"{metrics['average_session_duration']:.2f}"
-            else:
-                duration_display = "N/A"
-            
-            growth_color = get_growth_color(metrics['growth']['average_session_duration_growth'])
-            growth_text = format_growth_display(metrics['growth']['average_session_duration_growth'])
-            st.markdown(f"""
-            <div style='background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border: 1px solid #e5e7eb;'>
-                <div style='font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 8px;'>{duration_display}</div>
-                <div style='font-size: 0.875rem; color: #6b7280; font-weight: 500; margin-bottom: 8px;'>SECONDS</div>
-                <div style='color: {growth_color}; font-size: 0.875rem; font-weight: 500;'>
-                    {growth_text}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col5:
-            growth_color = get_growth_color(metrics['growth']['sessions_per_user_growth'])
-            growth_text = format_growth_display(metrics['growth']['sessions_per_user_growth'])
-            st.markdown(f"""
-            <div style='background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; border: 1px solid #e5e7eb;'>
-                <div style='font-size: 2rem; font-weight: 700; color: #1f2937; margin-bottom: 8px;'>{metrics['sessions_per_user']}</div>
-                <div style='font-size: 0.875rem; color: #6b7280; font-weight: 500; margin-bottom: 8px;'>SESSIONS/USER</div>
-                <div style='color: {growth_color}; font-size: 0.875rem; font-weight: 500;'>
-                    {growth_text}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
 else:
     st.info("No data available for the selected filters and date range.")
