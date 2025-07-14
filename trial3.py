@@ -411,7 +411,7 @@ def create_trend_chart_figure(daily_stats):
 def load_data():
     try:
         # Read the CSV files
-        df1 = pd.read_csv("cnbc(updated)2.csv", encoding='utf-8')
+        df1 = pd.read_csv("cnbc(updated)2--.csv", encoding='utf-8')
         df2 = pd.read_csv("cnbc2(updated).csv", encoding='utf-8')
         
         # Process df1 (User Login data)
@@ -994,7 +994,7 @@ selected_categories = st.sidebar.multiselect(
 )
 
 # Reset Filters button
-st.sidebar.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='margin-top: 130px;'></div>", unsafe_allow_html=True)
 if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
     filter_keys = [
         "city_selector", "age_selector", 
@@ -1577,6 +1577,227 @@ if not filtered_df.empty:
             
             st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
             st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
+    
+    # TOP CATEGORIES SECTION
+    if 'categoryauto_new_rank1' in filtered_df.columns and not filtered_df['categoryauto_new_rank1'].isna().all():
+        st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
+        
+        # Get all categories data from the original dataset (not filtered) - SAME AS TABLE
+        if st.session_state.user_login:
+            # For User Login: count unique users for each category
+            all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+        else:
+            # For User Non Login: use Total users for weighting
+            if 'Total users' in current_df.columns:
+                all_categories_data = current_df.groupby('categoryauto_new_rank1')['Total users'].sum().sort_values(ascending=False)
+            else:
+                all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+        
+        # Calculate percentages for all audience (for chart display)
+        total_all = all_categories_data.sum()
+        percentages_all = (all_categories_data / total_all * 100) if total_all > 0 else all_categories_data * 0
+        
+        # Create top categories chart (top 10, sorted)
+        top_categories_data = all_categories_data.head(10)
+        top_categories_percentages = percentages_all.head(10)
+        
+        # Only show chart if there's data
+        if len(top_categories_data) > 0:
+            # Create the chart
+            top_categories_fig = go.Figure()
+            
+            # Add bars with purple gradient effect
+            for i, (category, pct) in enumerate(zip(top_categories_data.index, top_categories_percentages.values)):
+                top_categories_fig.add_trace(go.Bar(
+                    x=[category],
+                    y=[pct],
+                    marker=dict(
+                        color=f'rgba(139, 92, 246, {1 - i*0.08})',
+                        cornerradius=4,
+                        line=dict(width=0)
+                    ),
+                    text=f'{pct:.1f}%',
+                    textposition='outside',
+                    hovertemplate=f'Category: {category}<br>Percentage: {pct:.1f}%<extra></extra>',
+                    showlegend=False
+                ))
+            
+            top_categories_fig.update_layout(
+                xaxis_title="",
+                yaxis_title="Percentage",
+                showlegend=False,
+                height=280,
+                margin=dict(l=0, r=0, t=0, b=0),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                xaxis=dict(
+                    tickangle=45,
+                    gridcolor='rgba(0,0,0,0.1)',
+                    griddash='dot'
+                ),
+                yaxis=dict(
+                    range=[0, max(top_categories_percentages) * 1.15] if len(top_categories_percentages) > 0 else [0, 100],
+                    gridcolor='rgba(0,0,0,0.1)',
+                    griddash='dot'
+                )
+            )
+            
+            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Top Categories</h3>", unsafe_allow_html=True)
+            st.plotly_chart(top_categories_fig, use_container_width=True, key="top_categories_chart")
+    
+    # ALL CATEGORIES TABLE SECTION
+    if 'categoryauto_new_rank1' in current_df.columns and not current_df['categoryauto_new_rank1'].isna().all():
+        st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+        
+        # Get all categories data from the original dataset (not filtered)
+        if st.session_state.user_login:
+            # For User Login: count unique users for each category
+            all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+        else:
+            # For User Non Login: use Total users for weighting
+            if 'Total users' in current_df.columns:
+                all_categories_data = current_df.groupby('categoryauto_new_rank1')['Total users'].sum().sort_values(ascending=False)
+            else:
+                all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+        
+        # Calculate percentages for all audience (for table display)
+        total_all = all_categories_data.sum()
+        percentages_all = (all_categories_data / total_all * 100) if total_all > 0 else all_categories_data * 0
+        
+        # TOP 10 CATEGORIES LAYOUT - MOVED ABOVE TABLE
+        st.markdown("<h4 style='margin: 0 0 20px 0; color: #374151; font-size: 16px; font-weight: 600;'>Top 10 categories</h4>", unsafe_allow_html=True)
+        
+        # Get top 10 categories for the layout
+        top_10_categories = all_categories_data.head(10)
+        
+        # Create two rows of 5 containers each
+        row1_cols = st.columns(5)
+        row2_cols = st.columns(5)
+        
+        # First row (categories 1-5)
+        for i, (category, user_count) in enumerate(zip(top_10_categories.index[:5], top_10_categories.values[:5])):
+            with row1_cols[i]:
+                st.markdown(f"""
+                <div style='
+                    background-color: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 16px 12px;
+                    text-align: left;
+                    min-height: 80px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    margin-bottom: 12px;
+                '>
+                    <div style='
+                        font-weight: 600;
+                        color: #4f46e5;
+                        font-size: 18px;
+                        margin-bottom: 4px;
+                    '>{i+1}</div>
+                    <div style='
+                        font-weight: 500;
+                        color: #374151;
+                        font-size: 14px;
+                        line-height: 1.3;
+                        margin-bottom: 4px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        display: -webkit-box;
+                        -webkit-line-clamp: 2;
+                        -webkit-box-orient: vertical;
+                    '>{category}</div>
+                    <div style='
+                        font-size: 12px;
+                        color: #6b7280;
+                        font-weight: 500;
+                    '>{user_count:,} Users</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Second row (categories 6-10)
+        for i, (category, user_count) in enumerate(zip(top_10_categories.index[5:10], top_10_categories.values[5:10]), 5):
+            with row2_cols[i-5]:
+                st.markdown(f"""
+                <div style='
+                    background-color: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 16px 12px;
+                    text-align: left;
+                    min-height: 80px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    margin-bottom: 12px;
+                '>
+                    <div style='
+                        font-weight: 600;
+                        color: #4f46e5;
+                        font-size: 18px;
+                        margin-bottom: 4px;
+                    '>{i+1}</div>
+                    <div style='
+                        font-weight: 500;
+                        color: #374151;
+                        font-size: 14px;
+                        line-height: 1.3;
+                        margin-bottom: 4px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        display: -webkit-box;
+                        -webkit-line-clamp: 2;
+                        -webkit-box-orient: vertical;
+                    '>{category}</div>
+                    <div style='
+                        font-size: 12px;
+                        color: #6b7280;
+                        font-weight: 500;
+                    '>{user_count:,} Users</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Add spacing before the table
+        st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin: 0 0 15px 0; color: #374151; font-size: 16px;'>All Categories</h3>", unsafe_allow_html=True)
+        
+        # Create a dataframe for display
+        table_data = []
+        for i, (category, count) in enumerate(all_categories_data.items(), 1):
+            percentage = percentages_all[category]
+            table_data.append({
+                'Rank': i,
+                'Categories': category,
+                'All Audience': percentage  # Keep as numeric for bar chart
+            })
+        
+        # Create DataFrame and display with Streamlit
+        df_table = pd.DataFrame(table_data)
+        
+        # Display the table with custom styling and bar chart
+        st.dataframe(
+            df_table,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Rank": st.column_config.NumberColumn(
+                    "Rank",
+                    width="small",
+                ),
+                "Categories": st.column_config.TextColumn(
+                    "Categories",
+                    width="large",
+                ),
+                "All Audience": st.column_config.ProgressColumn(
+                    "All Audience",
+                    width="medium",
+                    min_value=0,
+                    max_value=100,
+                    format="%.1f%%",
+                ),
+            }
+        )
 
 else:
     st.info("No data available for the selected filters and date range.")
