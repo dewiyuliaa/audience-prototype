@@ -1641,18 +1641,18 @@ if not filtered_df.empty:
         if 'categoryauto_new_rank1' in filtered_df.columns and not filtered_df['categoryauto_new_rank1'].isna().all():
             st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
             
-            # Get all categories data from the original dataset (not filtered) - SAME AS TABLE
+            # Get categories data from the FILTERED dataset (changed from current_df to filtered_df)
             if st.session_state.user_login:
                 # For User Login: count unique users for each category
-                all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+                all_categories_data = filtered_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
             else:
                 # For User Non Login: use Total users for weighting
-                if 'Total users' in current_df.columns:
-                    all_categories_data = current_df.groupby('categoryauto_new_rank1')['Total users'].sum().sort_values(ascending=False)
+                if 'Total users' in filtered_df.columns:
+                    all_categories_data = filtered_df.groupby('categoryauto_new_rank1')['Total users'].sum().sort_values(ascending=False)
                 else:
-                    all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+                    all_categories_data = filtered_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
             
-            # Calculate percentages for all audience (for chart display)
+            # Calculate percentages for filtered audience (for chart display)
             total_all = all_categories_data.sum()
             percentages_all = (all_categories_data / total_all * 100) if total_all > 0 else all_categories_data * 0
             
@@ -1705,21 +1705,21 @@ if not filtered_df.empty:
                 st.plotly_chart(top_categories_fig, use_container_width=True, key="top_categories_chart")
         
         # ALL CATEGORIES TABLE SECTION
-        if 'categoryauto_new_rank1' in current_df.columns and not current_df['categoryauto_new_rank1'].isna().all():
+        if 'categoryauto_new_rank1' in filtered_df.columns and not filtered_df['categoryauto_new_rank1'].isna().all():
             st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
             
-            # Get all categories data from the original dataset (not filtered)
+            # Get categories data from the FILTERED dataset (changed from current_df to filtered_df)
             if st.session_state.user_login:
                 # For User Login: count unique users for each category
-                all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+                all_categories_data = filtered_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
             else:
                 # For User Non Login: use Total users for weighting
-                if 'Total users' in current_df.columns:
-                    all_categories_data = current_df.groupby('categoryauto_new_rank1')['Total users'].sum().sort_values(ascending=False)
+                if 'Total users' in filtered_df.columns:
+                    all_categories_data = filtered_df.groupby('categoryauto_new_rank1')['Total users'].sum().sort_values(ascending=False)
                 else:
-                    all_categories_data = current_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
+                    all_categories_data = filtered_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
             
-            # Calculate percentages for all audience (for table display)
+            # Calculate percentages for filtered audience (for table display)
             total_all = all_categories_data.sum()
             percentages_all = (all_categories_data / total_all * 100) if total_all > 0 else all_categories_data * 0
             
@@ -1729,93 +1729,96 @@ if not filtered_df.empty:
             # Get top 10 categories for the layout
             top_10_categories = all_categories_data.head(10)
             
-            # Create two rows of 5 containers each
-            row1_cols = st.columns(5)
-            row2_cols = st.columns(5)
-            
-            # First row (categories 1-5)
-            for i, (category, user_count) in enumerate(zip(top_10_categories.index[:5], top_10_categories.values[:5])):
-                with row1_cols[i]:
-                    st.markdown(f"""
-                    <div style='
-                        background-color: #f8fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 8px;
-                        padding: 16px 12px;
-                        text-align: left;
-                        min-height: 80px;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        margin-bottom: 12px;
-                    '>
+            # Only show the top 10 layout if there are categories
+            if len(top_10_categories) > 0:
+                # Create two rows of 5 containers each
+                row1_cols = st.columns(5)
+                row2_cols = st.columns(5)
+                
+                # First row (categories 1-5)
+                for i, (category, user_count) in enumerate(zip(top_10_categories.index[:5], top_10_categories.values[:5])):
+                    with row1_cols[i]:
+                        st.markdown(f"""
                         <div style='
-                            font-weight: 600;
-                            color: #4f46e5;
-                            font-size: 18px;
-                            margin-bottom: 4px;
-                        '>{i+1}</div>
-                        <div style='
-                            font-weight: 500;
-                            color: #374151;
-                            font-size: 14px;
-                            line-height: 1.3;
-                            margin-bottom: 4px;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            display: -webkit-box;
-                            -webkit-line-clamp: 2;
-                            -webkit-box-orient: vertical;
-                        '>{category}</div>
-                        <div style='
-                            font-size: 12px;
-                            color: #6b7280;
-                            font-weight: 500;
-                        '>{user_count:,} Users</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            # Second row (categories 6-10)
-            for i, (category, user_count) in enumerate(zip(top_10_categories.index[5:10], top_10_categories.values[5:10]), 5):
-                with row2_cols[i-5]:
-                    st.markdown(f"""
-                    <div style='
-                        background-color: #f8fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 8px;
-                        padding: 16px 12px;
-                        text-align: left;
-                        min-height: 80px;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        margin-bottom: 12px;
-                    '>
-                        <div style='
-                            font-weight: 600;
-                            color: #4f46e5;
-                            font-size: 18px;
-                            margin-bottom: 4px;
-                        '>{i+1}</div>
-                        <div style='
-                            font-weight: 500;
-                            color: #374151;
-                            font-size: 14px;
-                            line-height: 1.3;
-                            margin-bottom: 4px;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            display: -webkit-box;
-                            -webkit-line-clamp: 2;
-                            -webkit-box-orient: vertical;
-                        '>{category}</div>
-                        <div style='
-                            font-size: 12px;
-                            color: #6b7280;
-                            font-weight: 500;
-                        '>{user_count:,} Users</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                            background-color: #f8fafc;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            padding: 16px 12px;
+                            text-align: left;
+                            min-height: 80px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            margin-bottom: 12px;
+                        '>
+                            <div style='
+                                font-weight: 600;
+                                color: #4f46e5;
+                                font-size: 18px;
+                                margin-bottom: 4px;
+                            '>{i+1}</div>
+                            <div style='
+                                font-weight: 500;
+                                color: #374151;
+                                font-size: 14px;
+                                line-height: 1.3;
+                                margin-bottom: 4px;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                                display: -webkit-box;
+                                -webkit-line-clamp: 2;
+                                -webkit-box-orient: vertical;
+                            '>{category}</div>
+                            <div style='
+                                font-size: 12px;
+                                color: #6b7280;
+                                font-weight: 500;
+                            '>{user_count:,} Users</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Second row (categories 6-10) - only if there are more than 5 categories
+                if len(top_10_categories) > 5:
+                    for i, (category, user_count) in enumerate(zip(top_10_categories.index[5:10], top_10_categories.values[5:10]), 5):
+                        with row2_cols[i-5]:
+                            st.markdown(f"""
+                            <div style='
+                                background-color: #f8fafc;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                padding: 16px 12px;
+                                text-align: left;
+                                min-height: 80px;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: center;
+                                margin-bottom: 12px;
+                            '>
+                                <div style='
+                                    font-weight: 600;
+                                    color: #4f46e5;
+                                    font-size: 18px;
+                                    margin-bottom: 4px;
+                                '>{i+1}</div>
+                                <div style='
+                                    font-weight: 500;
+                                    color: #374151;
+                                    font-size: 14px;
+                                    line-height: 1.3;
+                                    margin-bottom: 4px;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    display: -webkit-box;
+                                    -webkit-line-clamp: 2;
+                                    -webkit-box-orient: vertical;
+                                '>{category}</div>
+                                <div style='
+                                    font-size: 12px;
+                                    color: #6b7280;
+                                    font-weight: 500;
+                                '>{user_count:,} Users</div>
+                            </div>
+                            """, unsafe_allow_html=True)
             
             # Add spacing before the table
             st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
@@ -1857,6 +1860,9 @@ if not filtered_df.empty:
                     ),
                 }
             )
+        else:
+            # Show message when no category data is available after filtering
+            st.info("No category data available for the selected filters.")
 
 else:
     st.info("No data available for the selected filters and date range.")
