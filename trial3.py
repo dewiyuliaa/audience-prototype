@@ -640,7 +640,13 @@ def load_data():
     try:
         # Read the CSV files
         df1 = pd.read_csv("cnbc(fix).csv", encoding='utf-8')
-        df2 = pd.read_csv("cnbc2(fix)-2.csv", encoding='utf-8')
+        
+        # Read and combine two files for df2
+        df2_part1 = pd.read_csv("cnbc2(fix)-1.csv", encoding='utf-8')
+        df2_part2 = pd.read_csv("cnbc2(fix)-2.csv", encoding='utf-8')
+        
+        # Combine the two df2 files
+        df2 = pd.concat([df2_part1, df2_part2], ignore_index=True)
         
         # Process df1 (User Login data)
         df1['date'] = pd.to_datetime(df1['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
