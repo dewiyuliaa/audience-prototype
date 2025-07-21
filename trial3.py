@@ -20,24 +20,6 @@ if 'user_login' not in st.session_state:
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = 'overview'
 
-# Function to load and encode logo
-def get_logo_base64():
-    """Load and encode the CNBC logo"""
-    try:
-        logo_path = "CNBC_logo.svg.png"
-        expanded_path = os.path.expanduser(logo_path)
-        
-        if os.path.exists(expanded_path):
-            with open(expanded_path, "rb") as f:
-                logo_data = f.read()
-            return base64.b64encode(logo_data).decode()
-        
-        # If logo not found, return empty string (no logo will be displayed)
-        return ""
-    except Exception as e:
-        # If there's any error loading the logo, return empty string
-        return ""
-
 # New functions for audience size estimation
 def format_audience_range(estimated_value):
     """Convert estimated audience to a range format with M/K formatting"""
