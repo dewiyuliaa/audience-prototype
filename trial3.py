@@ -1169,6 +1169,35 @@ st.markdown("""
         opacity: 0.7;
         line-height: 1.4;
     }
+    
+    /* Allo Wallet Cards Styling */
+    .allo-wallet-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .allo-wallet-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+        opacity: 0.9;
+    }
+    
+    .allo-wallet-value {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 8px 0;
+    }
+    
+    .allo-wallet-subtitle {
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1403,8 +1432,6 @@ div[data-testid="column"]:nth-child(2) .stButton > button:focus {{
 if 'download_triggered' not in st.session_state:
     st.session_state.download_triggered = False
 
-
-
 # Main content based on active tab
 if not filtered_df.empty:
     if st.session_state.active_tab == 'overview':
@@ -1466,18 +1493,6 @@ if not filtered_df.empty:
                         <br><br>
                         Reachable Audience is based on audience who have provided valid contact information (email or phone number). This can be downloaded by clicking the button in the top right corner.
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="audience-size-card">
-                    <div class="audience-size-title">Audience Size</div>
-                    <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
-                    <div class="audience-size-value">{audience_range}</div>
-                    <div class="audience-size-disclaimer">
-                        Estimates may vary significantly over time based on your targeting selections and available data.
-                    </div>
-                </div>
                 """, unsafe_allow_html=True)
         
         with trend_col:
@@ -1626,6 +1641,60 @@ if not filtered_df.empty:
                 
                 st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
                 st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
+        
+        # Add Allo Wallet Cards section (User Login only)
+        if st.session_state.user_login and 'aws' in filtered_df.columns:
+            st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 20px 0; color: #374151; font-size: 16px;'>Allo Wallet Status</h3>", unsafe_allow_html=True)
+            
+            # Calculate unique users for each Allo Wallet status in last 30 days
+            allo_pay_users = 0
+            allo_pay_plus_users = 0
+            allo_prime_users = 0
+            
+            if 'user_id' in filtered_df.columns:
+                allo_pay_users = filtered_df[filtered_df['aws'] == 'ALLO_PAY']['user_id'].nunique()
+                allo_pay_plus_users = filtered_df[filtered_df['aws'] == 'ALLO_PAY_PLUS']['user_id'].nunique()
+                allo_prime_users = filtered_df[filtered_df['aws'] == 'ALLO_PRIME']['user_id'].nunique()
+            elif 'userid' in filtered_df.columns:
+                allo_pay_users = filtered_df[filtered_df['aws'] == 'ALLO_PAY']['userid'].nunique()
+                allo_pay_plus_users = filtered_df[filtered_df['aws'] == 'ALLO_PAY_PLUS']['userid'].nunique()
+                allo_prime_users = filtered_df[filtered_df['aws'] == 'ALLO_PRIME']['userid'].nunique()
+            else:
+                # Fallback: count rows
+                allo_pay_users = len(filtered_df[filtered_df['aws'] == 'ALLO_PAY'])
+                allo_pay_plus_users = len(filtered_df[filtered_df['aws'] == 'ALLO_PAY_PLUS'])
+                allo_prime_users = len(filtered_df[filtered_df['aws'] == 'ALLO_PRIME'])
+            
+            # Create three columns for the Allo Wallet cards
+            allo_col1, allo_col2, allo_col3 = st.columns(3)
+            
+            with allo_col1:
+                st.markdown(f"""
+                <div class="allo-wallet-card">
+                    <div class="allo-wallet-title">Allo Pay</div>
+                    <div class="allo-wallet-value">{format_number_display(allo_pay_users)}</div>
+                    <div class="allo-wallet-subtitle">audiences in last 30 days</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with allo_col2:
+                st.markdown(f"""
+                <div class="allo-wallet-card">
+                    <div class="allo-wallet-title">Allo Pay Plus</div>
+                    <div class="allo-wallet-value">{format_number_display(allo_pay_plus_users)}</div>
+                    <div class="allo-wallet-subtitle">audiences in last 30 days</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with allo_col3:
+                st.markdown(f"""
+                <div class="allo-wallet-card">
+                    <div class="allo-wallet-title">Allo Prime</div>
+                    <div class="allo-wallet-value">{format_number_display(allo_prime_users)}</div>
+                    <div class="allo-wallet-subtitle">audiences in last 30 days</div>
+                </div>
+                """, unsafe_allow_html=True)
     
     elif st.session_state.active_tab == 'interests':
         # INTERESTS TAB CONTENT
