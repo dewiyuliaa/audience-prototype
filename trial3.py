@@ -1481,19 +1481,19 @@ if not filtered_df.empty:
         size_col, trend_col = st.columns([1, 2])
         
         with size_col:
-            # Audience Size Card with conditional text based on user_login
-            if st.session_state.user_login:
-                st.markdown(f"""
-                <div class="audience-size-card">
-                    <div class="audience-size-title">Audience Size</div>
-                    <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
-                    <div class="audience-size-value">{audience_range}</div>
-                    <div class="audience-size-disclaimer">
-                        Estimates may vary significantly over time based on your targeting selections and available data.
-                        <br><br>
-                        Reachable Audience is based on audience who have provided valid contact information (email or phone number). This can be downloaded by clicking the button in the top right corner.
-                    </div>
-                """, unsafe_allow_html=True)
+            # Audience Size Card - show for both User Login and User Non Login
+            st.markdown(f"""
+            <div class="audience-size-card">
+                <div class="audience-size-title">Audience Size</div>
+                <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
+                <div class="audience-size-value">{audience_range}</div>
+                <div class="audience-size-disclaimer">
+                    Estimates may vary significantly over time based on your targeting selections and available data.
+                    <br><br>
+                    {"Reachable Audience is based on audience who have provided valid contact information (email or phone number). This can be downloaded by clicking the button in the top right corner." if st.session_state.user_login else "This audience size is based on the total users data from Google Analytics for the selected filters and time period."}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
         with trend_col:
             # Trend Chart
