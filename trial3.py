@@ -622,7 +622,7 @@ def load_data():
     try:
         # Read and combine two files for df2
         df1_part1 = pd.read_csv("cnbc-1.csv", encoding='utf-8')
-        df1_part2 = pd.read_csv("cnbc-2.csv", encoding='utf-8')
+        df1_part2 = pd.read_csv("cnbc-1.csv", encoding='utf-8')
         
         # Read and combine two files for df2
         df2_part1 = pd.read_csv("cnbc2-1.csv", encoding='utf-8')
