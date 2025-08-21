@@ -620,16 +620,12 @@ def create_device_chart(df, user_login=True):
 @st.cache_data
 def load_data():
     try:
-        # Read and combine two files for df2
-        df1_part1 = pd.read_csv("cnbc-1.csv", encoding='utf-8')
-        df1_part2 = pd.read_csv("cnbc-2.csv", encoding='utf-8')
+        # Read file for df1
+        df1 = pd.read_csv("cnbc.csv", encoding='utf-8')
         
         # Read and combine two files for df2
         df2_part1 = pd.read_csv("cnbc2-1.csv", encoding='utf-8')
         df2_part2 = pd.read_csv("cnbc2-2.csv", encoding='utf-8')
-
-        # Combine the two df2 files
-        df1 = pd.concat([df1_part1, df1_part2], ignore_index=True)
         
         # Combine the two df2 files
         df2 = pd.concat([df2_part1, df2_part2], ignore_index=True)
