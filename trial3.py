@@ -620,15 +620,24 @@ def create_device_chart(df, user_login=True):
 @st.cache_data
 def load_data():
     try:
-        # Read file for df1
-        df1 = pd.read_csv("cnbc.csv", encoding='utf-8')
+        # === df1 langsung dari BigQuery ===
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"]
+        )
+        client = bigquery.Client(credentials=credentials)
+
+        query_df1 = """
+        SELECT *
+        FROM `pm-data-217109.dewi_audience_poc.cnbc_lookup`
+        """
+        df1 = client.query(query_df1).to_dataframe()
         
-        # Read and combine two files for df2
-        df2_part1 = pd.read_csv("cnbc2-1.csv", encoding='utf-8')
-        df2_part2 = pd.read_csv("cnbc2-2.csv", encoding='utf-8')
+        # === df2 langsung dari Google Sheets ===
+        sheet_url = "https://docs.google.com/spreadsheets/d/1JcJnH9dOAjUZkDHwgaFH59CYKoH64PK4iPZIDX2RDok/gviz/tq?tqx=out:csv&sheet=Sheet1"
+        resp = requests.get(sheet_url)
+        resp.raise_for_status()
         
-        # Combine the two df2 files
-        df2 = pd.concat([df2_part1, df2_part2], ignore_index=True)
+        df2 = pd.read_csv(io.StringIO(resp.text))
         
         # Process df1 (User Login data)
         df1['date'] = pd.to_datetime(df1['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
