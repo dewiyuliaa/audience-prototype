@@ -544,13 +544,23 @@ def create_gender_chart(df, user_login=True):
     total = gender_data.sum()
     percentages = (gender_data / total * 100) if total > 0 else gender_data * 0
     
+    # Create explicit color mapping
+    color_map = {
+        'female': 'rgba(236, 72, 153, 0.8)',  # Pink
+        'male': 'rgba(59, 130, 246, 0.8)',     # Blue  
+        'unknown': 'rgba(16, 185, 129, 0.8)'  # Green (fallback)
+    }
+    
+    # Create colors list based on actual data order
+    colors = [color_map.get(gender.lower(), 'rgba(128, 128, 128, 0.8)') for gender in gender_data.index]
+    
     # Create pie chart
     fig = go.Figure(data=[go.Pie(
         labels=[label.title() for label in gender_data.index],
         values=percentages,
         hole=0.5,
         marker=dict(
-            colors=['rgba(79, 70, 229, 0.8)', 'rgba(6, 182, 212, 0.8)', 'rgba(16, 185, 129, 0.8)'],
+            colors=colors,
             line=dict(color='rgba(255,255,255,0.8)', width=2)
         ),
         textinfo='none',
@@ -583,6 +593,18 @@ def create_device_chart(df, user_login=True):
     total = device_data.sum()
     percentages = (device_data / total * 100) if total > 0 else device_data * 0
     
+    # Create explicit color mapping
+    color_map = {
+        'desktop': 'rgba(16, 185, 129, 0.8)',   # Green
+        'mobile': 'rgba(255, 193, 7, 0.8)',     # Yellow
+        'tablet': 'rgba(108, 117, 125, 0.8)',   # Grey
+        # Add fallback for any other device types
+        'smart tv': 'rgba(128, 128, 128, 0.8)'
+    }
+    
+    # Create colors list based on actual data order
+    colors = [color_map.get(device.lower(), 'rgba(128, 128, 128, 0.8)') for device in device_data.index]
+    
     # Create custom labels with percentages
     labels_with_pct = []
     for label, pct in zip(device_data.index, percentages):
@@ -594,7 +616,7 @@ def create_device_chart(df, user_login=True):
         values=percentages,
         hole=0.5,
         marker=dict(
-            colors=['rgba(16, 185, 129, 0.8)', 'rgba(16, 185, 129, 0.6)', 'rgba(16, 185, 129, 0.4)'],
+            colors=colors,
             line=dict(color='rgba(255,255,255,0.8)', width=2)
         ),
         textinfo='none',
@@ -612,7 +634,7 @@ def create_device_chart(df, user_login=True):
             y=0.5,
             xanchor="left",
             x=0.85,
-            font=dict(size=11)
+            font=dict(size=14)
         ),
         plot_bgcolor='white',
         paper_bgcolor='white'
@@ -906,8 +928,32 @@ filter_options = get_filter_options(st.session_state.user_login)
 # Sidebar configuration
 st.sidebar.title("Filter audience")
 
+# Add User Type Selection to Sidebar
+st.sidebar.markdown("### 👤 User Type")
+
+# Add small spacing to push buttons down
+st.sidebar.markdown("<div style='margin-top: 80px;'></div>", unsafe_allow_html=True)
+
+# Create columns for the buttons in sidebar
+col1, col2 = st.sidebar.columns(2)
+
+with col1:
+    if st.button("User Login", key="sidebar_login_btn", use_container_width=True):
+        if not st.session_state.user_login:
+            st.session_state.user_login = True
+            st.rerun()
+
+with col2:
+    if st.button("User Non Login", key="sidebar_non_login_btn", use_container_width=True):
+        if st.session_state.user_login:
+            st.session_state.user_login = False
+            st.rerun()
+
+# Add spacing after user type buttons
+st.sidebar.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+
 # City selector
-st.sidebar.markdown("### 📍 Locations")
+st.sidebar.markdown("<h3 style='margin-top: -30px;'>📍 Locations</h3>", unsafe_allow_html=True)
 selected_cities = st.sidebar.multiselect(
     "",
     filter_options['cities'],
@@ -918,7 +964,7 @@ selected_cities = st.sidebar.multiselect(
 )
 
 # Age selector
-st.sidebar.markdown("### 👤 Demographics")
+st.sidebar.markdown("### 👤&nbsp;&nbsp;Demographics")
 selected_age = st.sidebar.multiselect(
     "Age",
     filter_options['age_groups'],
@@ -940,7 +986,7 @@ if len(filter_options['genders']) >= 2:
     selected_genders = [g.lower() for g in gender_options]
 
 # Kanal selector
-st.sidebar.markdown("### 📺 Select kanal")
+st.sidebar.markdown("### 📺&nbsp;&nbsp;Select kanal")
 selected_kanal = st.sidebar.multiselect(
     "",
     filter_options['kanals'],
@@ -964,7 +1010,7 @@ selected_device = st.sidebar.multiselect(
 # AWS selector (User Login only)
 selected_aws = []
 if st.session_state.user_login and filter_options['aws']:
-    st.sidebar.markdown("### 💳 Select Allo Wallet Status")
+    st.sidebar.markdown("### 💳&nbsp;&nbsp;Select Allo Wallet Status")
     selected_aws = st.sidebar.multiselect(
         "",
         filter_options['aws'],
@@ -977,7 +1023,7 @@ if st.session_state.user_login and filter_options['aws']:
 # Paylater Status selector (User Login only)
 selected_paylater = []
 if st.session_state.user_login and filter_options['paylater_status']:
-    st.sidebar.markdown("### 🏦 Select Paylater Status")
+    st.sidebar.markdown("### 🏦&nbsp;&nbsp;Select Paylater Status")
     selected_paylater = st.sidebar.multiselect(
         "",
         filter_options['paylater_status'],
@@ -988,7 +1034,7 @@ if st.session_state.user_login and filter_options['paylater_status']:
     )
 
 # Category selector
-st.sidebar.markdown("### 🏷️ Select category")
+st.sidebar.markdown("### 🏷️&nbsp;&nbsp;Select category")
 selected_categories = st.sidebar.multiselect(
     "",
     filter_options['categories'],
@@ -1019,30 +1065,33 @@ if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
     st.session_state["category_selector"] = []
     st.session_state["aws_selector"] = []
     st.session_state["paylater_selector"] = []
+    
+    # Reset user_login to default state (True for User Login)
+    st.session_state.user_login = True
         
     st.rerun()
 
 # CSS and Header styling
-st.markdown("""
+st.markdown(f"""
 <style>
     /* Hide Streamlit default elements */
-    .stDeployButton {display:none;}
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    .stDeployButton {{display:none;}}
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+    header {{visibility: hidden;}}
     
     /* Main styling */
-    .stApp {
+    .stApp {{
         background-color: #ffffff;
-    }
+    }}
     
     /* Force full width for header */
-    .block-container {
+    .block-container {{
         padding-top: 0 !important;
-    }
+    }}
     
     /* Full width header */
-    .tiktok-header {
+    .tiktok-header {{
         background-color: #1a1a1a;
         margin: -1rem -100vw 1rem -100vw;
         padding: 12px 100vw;
@@ -1052,23 +1101,23 @@ st.markdown("""
         min-height: 60px;
         border-bottom: 1px solid #333;
         position: relative;
-    }
+    }}
     
-    .header-title {
+    .header-title {{
         color: white;
         font-size: 1.2rem;
         font-weight: 600;
         margin: 0;
         padding-left: 24px;
-    }
+    }}
     
-    .header-nav {
+    .header-nav {{
         display: flex;
         gap: 0;
         padding-right: 24px;
-    }
+    }}
     
-    .nav-item {
+    .nav-item {{
         color: #9ca3af;
         padding: 8px 20px;
         font-size: 0.95rem;
@@ -1076,37 +1125,37 @@ st.markdown("""
         cursor: pointer;
         border-bottom: 2px solid transparent;
         transition: all 0.2s ease;
-    }
+    }}
     
-    .nav-item:hover {
+    .nav-item:hover {{
         color: #e5e7eb;
-    }
+    }}
     
-    .nav-item.active {
+    .nav-item.active {{
         color: white;
         border-bottom-color: #ff0050;
-    }
+    }}
     
     /* Remove extra spacing in plotly charts */
-    .js-plotly-plot {
+    .js-plotly-plot {{
         margin: 0 !important;
-    }
+    }}
     
     /* Streamlit plotly chart container */
-    .stPlotlyChart {
+    .stPlotlyChart {{
         margin: 0 !important;
         padding: 0 !important;
-    }
+    }}
     
     /* Audience overview tabs */
-    .audience-tabs {
+    .audience-tabs {{
         display: flex;
         gap: 2px;
         margin-bottom: 20px;
         border-bottom: 1px solid #e2e8f0;
-    }
+    }}
     
-    .audience-tab {
+    .audience-tab {{
         padding: 12px 24px;
         background: transparent;
         border: none;
@@ -1115,15 +1164,15 @@ st.markdown("""
         color: #6b7280;
         cursor: pointer;
         transition: all 0.2s ease;
-    }
+    }}
     
-    .audience-tab.active {
+    .audience-tab.active {{
         color: #4f46e5;
         border-bottom-color: #4f46e5;
-    }
+    }}
     
     /* Style the Export contact button to look like text */
-    button[title="Download contact data"] {
+    button[title="Download contact data"] {{
         background: transparent !important;
         border: none !important;
         color: #6b7280 !important;
@@ -1132,55 +1181,55 @@ st.markdown("""
         box-shadow: none !important;
         text-decoration: none !important;
         font-size: 0.95rem !important;
-    }
-    button[title="Download contact data"]:hover {
+    }}
+    button[title="Download contact data"]:hover {{
         color: #4b5563 !important;
         text-decoration: underline !important;
         background: transparent !important;
         border: none !important;
-    }
-    button[title="Download contact data"]:focus {
+    }}
+    button[title="Download contact data"]:focus {{
         outline: none !important;
         box-shadow: none !important;
         background: transparent !important;
         border: none !important;
-    }
+    }}
     
     /* Audience Size Card Styling */
-    .audience-size-card {
+    .audience-size-card {{
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 24px;
         border-radius: 16px;
         color: white;
         margin-bottom: 20px;
-    }
+    }}
     
-    .audience-size-title {
-        font-size: 1.1rem;
+    .audience-size-title {{
+        font-size: 20px;
         margin-bottom: 8px;
         opacity: 0.9;
-    }
+    }}
     
-    .audience-size-value {
+    .audience-size-value {{
         font-size: 2.5rem;
         font-weight: 700;
         margin: 16px 0;
-    }
+    }}
     
-    .audience-size-subtitle {
+    .audience-size-subtitle {{
         font-size: 0.9rem;
         opacity: 0.8;
         margin-bottom: 16px;
-    }
+    }}
     
-    .audience-size-disclaimer {
+    .audience-size-disclaimer {{
         font-size: 0.85rem;
         opacity: 0.7;
         line-height: 1.4;
-    }
+    }}
     
     /* Allo Wallet Cards Styling */
-    .allo-wallet-card {
+    .allo-wallet-card {{
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 20px;
         border-radius: 12px;
@@ -1188,25 +1237,65 @@ st.markdown("""
         text-align: center;
         margin-bottom: 16px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
+    }}
     
-    .allo-wallet-title {
+    .allo-wallet-title {{
         font-size: 1rem;
         font-weight: 600;
         margin-bottom: 8px;
         opacity: 0.9;
-    }
+    }}
     
-    .allo-wallet-value {
+    .allo-wallet-value {{
         font-size: 2rem;
         font-weight: 700;
         margin: 8px 0;
-    }
+    }}
     
-    .allo-wallet-subtitle {
+    .allo-wallet-subtitle {{
         font-size: 0.8rem;
         opacity: 0.8;
-    }
+    }}
+    
+    /* Sidebar User Type Buttons Styling */
+    .stSidebar .stButton > button {{
+        background-color: #f8f9fa !important;
+        border: 2px solid #e9ecef !important;
+        color: #495057 !important;
+        font-weight: 500 !important;
+        padding: 8px 12px !important;
+        border-radius: 6px !important;
+        transition: all 0.2s ease !important;
+        font-size: 0.85rem !important;
+        height: auto !important;
+    }}
+    
+    .stSidebar .stButton > button:hover {{
+        background-color: #e9ecef !important;
+        border-color: #dee2e6 !important;
+        color: #343a40 !important;
+    }}
+    
+    /* Active state for User Login button (first column) */
+    .stSidebar div[data-testid="column"]:nth-child(1) .stButton > button {{
+        background-color: {'#fff5f5' if st.session_state.user_login else '#f8f9fa'} !important;
+        border: {'2px solid #ef4444' if st.session_state.user_login else '2px solid #e9ecef'} !important;
+        color: {'#dc2626' if st.session_state.user_login else '#495057'} !important;
+        font-weight: {'600' if st.session_state.user_login else '500'} !important;
+    }}
+    
+    /* Active state for User Non Login button (second column) */
+    .stSidebar div[data-testid="column"]:nth-child(2) .stButton > button {{
+        background-color: {'#fff5f5' if not st.session_state.user_login else '#f8f9fa'} !important;
+        border: {'2px solid #ef4444' if not st.session_state.user_login else '2px solid #e9ecef'} !important;
+        color: {'#dc2626' if not st.session_state.user_login else '#495057'} !important;
+        font-weight: {'600' if not st.session_state.user_login else '500'} !important;
+    }}
+    
+    .stSidebar .stButton > button:focus {{
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1218,28 +1307,6 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-# Create navigation buttons in a container that looks like the header
-nav_container = st.container()
-with nav_container:
-    # Position the buttons in the top right
-    col1, col2, col3, col4 = st.columns([5, 1.2, 1.4, 0.5])
-    
-    with col2:
-        if st.button("User Login", 
-                     key="login_nav_btn", 
-                     use_container_width=True):
-            if not st.session_state.user_login:
-                st.session_state.user_login = True
-                st.rerun()
-
-    with col3:
-        if st.button("User Non Login", 
-                     key="non_login_nav_btn", 
-                     use_container_width=True):
-            if st.session_state.user_login:
-                st.session_state.user_login = False
-                st.rerun()
 
 # Add CSS to style the buttons and position them like the original header
 st.markdown(f"""
@@ -1493,20 +1560,20 @@ if not filtered_df.empty:
             # Audience Size Card - show for both User Login and User Non Login
             st.markdown(f"""
             <div class="audience-size-card">
-                <div class="audience-size-title">Audience Size</div>
-                <div class="audience-size-subtitle">Estimated Audience Size (30 days)</div>
+                <div class="audience-size-title">Total Audience</div>
+                <div class="audience-size-subtitle">Estimated Total Audience (30 days)</div>
                 <div class="audience-size-value">{audience_range}</div>
                 <div class="audience-size-disclaimer">
                     Estimates may vary significantly over time based on your targeting selections and available data.
                     <br><br>
-                    {"Reachable Audience is based on audience who have provided valid contact information (email or phone number). This can be downloaded by clicking the button in the top right corner." if st.session_state.user_login else "This audience size is based on the total users data from Google Analytics for the selected filters and time period."}
+                    {"Reachable Audience is based on audience who have provided valid contact information (email or phone number). This can be downloaded by clicking the button in the top right corner." if st.session_state.user_login else "This total audience is based on the total users data from Google Analytics for the selected filters and time period."}
                 </div>
             </div>
             """, unsafe_allow_html=True)
         
         with trend_col:
             # Trend Chart
-            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Trend: Last 30 Days</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 20px;'>📈&nbsp;&nbsp;&nbsp;Trend: Last 30 Days</h3>", unsafe_allow_html=True)
             trend_fig = create_trend_chart(filtered_df, st.session_state.user_login, days_to_show=30)
             st.plotly_chart(trend_fig, use_container_width=True, key="trend_chart")
         
@@ -1518,13 +1585,13 @@ if not filtered_df.empty:
         
         with col1:
             # Age chart - now simplified to show only selected audience
-            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Age</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 20px;'>👥&nbsp;&nbsp;&nbsp;Age</h3>", unsafe_allow_html=True)
             age_fig = create_age_chart(filtered_df, st.session_state.user_login)
             st.plotly_chart(age_fig, use_container_width=True, key="age_chart")
         
         with col2:
             # Gender chart with statistics stacked vertically
-            st.markdown("<h3 style='margin: 0 0 -30px 0; color: #374151; font-size: 16px;'>Gender</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 -30px 0; color: #374151; font-size: 20px;'>🚻&nbsp;&nbsp;&nbsp;Gender</h3>", unsafe_allow_html=True)
             
             if not filtered_df.empty:
                 gender_fig, gender_percentages = create_gender_chart(filtered_df, st.session_state.user_login)
@@ -1534,13 +1601,23 @@ if not filtered_df.empty:
                 for label, pct in zip(gender_percentages.index, gender_percentages):
                     selected_labels_with_pct.append(f"{label.title()}<br>{pct:.1f}%")
                 
+                # Create explicit color mapping for selected audience chart
+                color_map = {
+                    'female': 'rgba(236, 72, 153, 0.8)',  # Pink
+                    'male': 'rgba(59, 130, 246, 0.8)',     # Blue  
+                    'unknown': 'rgba(16, 185, 129, 0.8)'  # Green (fallback)
+                }
+
+                # Create colors list based on actual data order
+                selected_colors = [color_map.get(gender.lower(), 'rgba(128, 128, 128, 0.8)') for gender in gender_percentages.index]
+                
                 # Recreate Selected audience chart with percentages in labels
                 selected_gender_fig = go.Figure(data=[go.Pie(
                     labels=selected_labels_with_pct,
                     values=gender_percentages,
                     hole=0.5,
                     marker=dict(
-                        colors=['rgba(79, 70, 229, 0.8)', 'rgba(79, 70, 229, 0.5)'],
+                        colors=selected_colors,
                         line=dict(color='rgba(255,255,255,0.8)', width=2)
                     ),
                     textinfo='none',
@@ -1558,7 +1635,7 @@ if not filtered_df.empty:
                         y=0.5,
                         xanchor="left",
                         x=0.85,
-                        font=dict(size=11)
+                        font=dict(size=14)
                     ),
                     plot_bgcolor='white',
                     paper_bgcolor='white'
@@ -1571,13 +1648,13 @@ if not filtered_df.empty:
         
         with city_col:
             # Top Cities chart - simplified to show only selected audience
-            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Top Cities</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 20px;'>📍&nbsp;&nbsp;&nbsp;Top Cities</h3>", unsafe_allow_html=True)
             city_fig = create_city_chart(filtered_df, st.session_state.user_login)
             st.plotly_chart(city_fig, use_container_width=True, key="top_cities_chart")
         
         with device_col:
             # Device Category chart as pie chart
-            st.markdown("<h3 style='margin: 0 0 -30px 0; color: #374151; font-size: 16px;'>Device Category</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 -30px 0; color: #374151; font-size: 20px;'>📱&nbsp;&nbsp;&nbsp;Device Category</h3>", unsafe_allow_html=True)
             device_fig = create_device_chart(filtered_df, st.session_state.user_login)
             st.plotly_chart(device_fig, use_container_width=True, key="device_category_chart")
         
@@ -1648,13 +1725,13 @@ if not filtered_df.empty:
                     )
                 )
                 
-                st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 16px;'>Kanal Groups</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='margin: 0 0 10px 0; color: #374151; font-size: 20px;'>📰&nbsp;&nbsp;&nbsp;Kanal Groups</h3>", unsafe_allow_html=True)
                 st.plotly_chart(kanal_fig, use_container_width=True, key="kanal_groups_chart")
         
         # Add Allo Wallet Cards section (User Login only)
         if st.session_state.user_login and 'aws' in filtered_df.columns:
             st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
-            st.markdown("<h3 style='margin: 0 0 20px 0; color: #374151; font-size: 16px;'>Allo Wallet Status</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='margin: 0 0 20px 0; color: #374151; font-size: 20px;'>💳&nbsp;&nbsp;&nbsp;Allo Wallet Status</h3>", unsafe_allow_html=True)
             
             # Calculate unique users for each Allo Wallet status in last 30 days
             allo_pay_users = 0
