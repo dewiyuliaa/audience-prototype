@@ -949,8 +949,11 @@ elif selected_user_type == "User Non Login" and st.session_state.user_login:
     st.session_state.user_login = False
     st.rerun()
 
+# Add spacing between User Type and Locations
+st.sidebar.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+
 # City selector
-st.sidebar.markdown("### 📍 Locations")
+st.sidebar.markdown("<h3 style='margin-top: -30px;'>📍 Locations</h3>", unsafe_allow_html=True)
 selected_cities = st.sidebar.multiselect(
     "",
     filter_options['cities'],
@@ -961,7 +964,7 @@ selected_cities = st.sidebar.multiselect(
 )
 
 # Age selector
-st.sidebar.markdown("### 👤 Demographics")
+st.sidebar.markdown("### 👤&nbsp;&nbsp;Demographics")
 selected_age = st.sidebar.multiselect(
     "Age",
     filter_options['age_groups'],
@@ -983,7 +986,7 @@ if len(filter_options['genders']) >= 2:
     selected_genders = [g.lower() for g in gender_options]
 
 # Kanal selector
-st.sidebar.markdown("### 📺 Select kanal")
+st.sidebar.markdown("### 📺&nbsp;&nbsp;Select kanal")
 selected_kanal = st.sidebar.multiselect(
     "",
     filter_options['kanals'],
@@ -1007,7 +1010,7 @@ selected_device = st.sidebar.multiselect(
 # AWS selector (User Login only)
 selected_aws = []
 if st.session_state.user_login and filter_options['aws']:
-    st.sidebar.markdown("### 💳 Select Allo Wallet Status")
+    st.sidebar.markdown("### 💳&nbsp;&nbsp;Select Allo Wallet Status")
     selected_aws = st.sidebar.multiselect(
         "",
         filter_options['aws'],
@@ -1020,7 +1023,7 @@ if st.session_state.user_login and filter_options['aws']:
 # Paylater Status selector (User Login only)
 selected_paylater = []
 if st.session_state.user_login and filter_options['paylater_status']:
-    st.sidebar.markdown("### 🏦 Select Paylater Status")
+    st.sidebar.markdown("### 🏦&nbsp;&nbsp;Select Paylater Status")
     selected_paylater = st.sidebar.multiselect(
         "",
         filter_options['paylater_status'],
@@ -1031,7 +1034,7 @@ if st.session_state.user_login and filter_options['paylater_status']:
     )
 
 # Category selector
-st.sidebar.markdown("### 🏷️ Select category")
+st.sidebar.markdown("### 🏷️&nbsp;&nbsp;Select category")
 selected_categories = st.sidebar.multiselect(
     "",
     filter_options['categories'],
@@ -1045,7 +1048,7 @@ selected_categories = st.sidebar.multiselect(
 st.sidebar.markdown("<div style='margin-top: 130px;'></div>", unsafe_allow_html=True)
 if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
     filter_keys = [
-        "user_type_selector", "city_selector", "age_selector", 
+        "city_selector", "age_selector", 
         "gender_multiselect", "kanal_selector", 
         "device_selector", "category_selector", "aws_selector", "paylater_selector"
     ]
@@ -1054,7 +1057,6 @@ if st.sidebar.button("Reset", use_container_width=True, type="secondary"):
         if key in st.session_state:
             del st.session_state[key]
     
-    st.session_state["user_type_selector"] = "User Login"
     st.session_state["city_selector"] = []
     st.session_state["age_selector"] = []
     st.session_state["gender_multiselect"] = []
@@ -1266,6 +1268,66 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Add CSS to style the buttons and position them like the original header
+st.markdown(f"""
+<style>
+/* Position the navigation buttons to overlay on the black header */
+.stButton {{
+    position: relative;
+    margin-top: -80px;
+    z-index: 999;
+}}
+
+/* Style buttons to look like header navigation tabs - NO RED BORDER */
+.stButton > button {{
+    background-color: transparent !important;
+    border: none !important;
+    color: #9ca3af !important;
+    padding: 8px 20px !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    border-bottom: none !important;
+    transition: all 0.2s ease !important;
+    height: 45px !important;
+}}
+
+.stButton > button:hover {{
+    color: #e5e7eb !important;
+    background-color: transparent !important;
+    border: none !important;
+}}
+
+/* Active state styling - NO RED BORDER */
+.stButton > button[aria-pressed="true"] {{
+    color: white !important;
+    border-bottom: none !important;
+    background-color: transparent !important;
+}}
+
+/* Style for User Login button - First button (col2) */
+div[data-testid="column"]:nth-child(2) .stButton > button {{
+    color: {'white' if st.session_state.user_login else '#9ca3af'} !important;
+    border-bottom: none !important;
+}}
+
+/* Style for User Non Login button - Second button (col3) */
+div[data-testid="column"]:nth-child(3) .stButton > button {{
+    color: {'white' if not st.session_state.user_login else '#9ca3af'} !important;
+    border-bottom: none !important;
+}}
+
+.stButton > button:focus {{
+    outline: none !important;
+    box-shadow: none !important;
+}}
+
+/* Adjust the main content margin */
+.block-container {{
+    margin-top: 20px !important;
+}}
+</style>
+""", unsafe_allow_html=True)
+
 # Apply filters to the dataframe
 current_df = df1 if st.session_state.user_login else df2
 filtered_df = current_df.copy()
@@ -1303,7 +1365,7 @@ if st.session_state.user_login:
     if selected_paylater and 'paylater_status' in current_df.columns:
         filtered_df = filtered_df[filtered_df['paylater_status'].isin(selected_paylater)]
 
-# Export contact section
+# Export contact section (KEEP POSITION)
 export_col1, export_col2, export_spacer, export_col3 = st.columns([1.8, 1.5, 3.7, 1.5])
 
 with export_col3:
@@ -1334,7 +1396,7 @@ with export_col3:
         # For User Non Login, show empty space or alternative content
         st.markdown("")
 
-# Add bottom border
+# Add bottom border (KEEP POSITION)
 st.markdown("""
 <div style='border-bottom: 1px solid #e2e8f0; margin-top: -7px; margin-bottom: 20px;'></div>
 """, unsafe_allow_html=True)
@@ -1342,7 +1404,7 @@ st.markdown("""
 # Add some spacing before tab buttons
 st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 
-# Audience overview tabs with Data download functionality
+# Audience overview tabs with Data download functionality (MOVED LOWER)
 tab_col1, tab_col2, spacer_col = st.columns([2.2, 1.5, 6.3])
 
 with tab_col1:
@@ -1688,6 +1750,7 @@ if not filtered_df.empty:
             
             # Get categories data from the FILTERED dataset (changed from current_df to filtered_df)
             if st.session_state.user_login:
+                # For User Login: count unique users for each category
                 all_categories_data = filtered_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
             else:
                 # For User Non Login: use Total users for weighting
@@ -1754,6 +1817,7 @@ if not filtered_df.empty:
             
             # Get categories data from the FILTERED dataset (changed from current_df to filtered_df)
             if st.session_state.user_login:
+                # For User Login: count unique users for each category
                 all_categories_data = filtered_df.groupby('categoryauto_new_rank1').size().sort_values(ascending=False)
             else:
                 # For User Non Login: use Total users for weighting
