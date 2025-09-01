@@ -1268,6 +1268,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+if not st.session_state.user_login:
+    st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
+
 # Add CSS to style the buttons and position them like the original header
 st.markdown(f"""
 <style>
